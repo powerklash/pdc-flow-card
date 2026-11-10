@@ -1136,7 +1136,7 @@ class PdcFlowCardEditor extends HTMLElement {
           const d = PDC_TEMP_RANGE[sch.name.slice(5)] || [10, 55];
           return 'Predefinito: ' + (sch.name.startsWith('tmin_') ? d[0] : d[1]) + ' °C';
         }
-        if (sch.name === 'autoclave_comando') return 'Per esempio select.autoclave_pumpdisable (Abilita / Disabilita)';
+        if (sch.name === 'autoclave_comando') return 'Un select con le opzioni Abilita / Disabilita, oppure uno switch (off = bloccata)';
         return undefined;
       };
       this._form.addEventListener('value-changed', (ev) => {
