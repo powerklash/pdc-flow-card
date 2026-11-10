@@ -11,6 +11,15 @@
  * Si configura dall'editor visuale oppure in YAML:
  *   type: custom:pdc-flow-card
  *   entities:            # ogni componente compare solo se la sua entità è impostata
+ *     (energia) fv_potenza, inverter_1_potenza, inverter_2_potenza, batteria_livello, batteria_potenza (+ = in scarica),
+ *     rete_potenza (+ = prelievo), rete_stato (on = rete collegata), casa_potenza
+ *   utenze:              # facoltativo: utenze elettriche che escono dalla casa
+ *     - entity: sensor.lavatrice_potenza
+ *       nome: Lavatrice
+ *       icona: mdi:washing-machine
+ *       colore: teal              # facoltativo
+ *       nascondi_a_zero: true     # facoltativo: la riga sparisce quando è spenta
+ *       soglia: 5                 # facoltativo: accesa sopra questo valore (unità del sensore)
  *     temperatura_esterna, pdc_potenza (anche lista), riscaldamento, raffrescamento,
  *     acs_potenza | acs_attiva, pdc_mandata, pdc_ritorno, acs_temperatura,
  *     accumulo_temperatura, accumulo_ingresso, circolatore, pavimento_mandata,
@@ -27,12 +36,22 @@
  *   temperature:               # facoltativo, per ogni temperatura (chiavi in PDC_TEMPS)
  *     bollitore: { colora: true, min: 35, max: 60 }   # nome, valore e icona da celeste (min) a rosso (max)
  *   (autoclave_comando: select Abilita/Disabilita o switch; toccando l'autoclave si apre il suo comando)
+ *   demo: true                 # facoltativo: dati di esempio finché non si imposta un'entità
+ *   batteria_inverti / rete_inverti: true   # facoltativo: segno opposto della potenza
+ *   soglia_energia: 0.1        # facoltativo: kW sopra cui il flusso elettrico si anima
  */
 
-const PDC_VERSION = '0.12.0';
+const PDC_VERSION = '0.16.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
+  sezione_energia: 'Energia',
+  fotovoltaico: 'Fotovoltaico',
+  inverter_1: 'Inverter 1',
+  inverter_2: 'Inverter 2',
+  batteria: 'Batteria',
+  rete_elettrica: 'Rete',
+  casa: 'Casa',
   sezione_impianto: 'Impianto',
   sezione_acqua: 'Acqua sanitaria',
   esterno: 'esterno',
@@ -57,18 +76,130 @@ const PDC_NOMI = {
 
 // Componenti a cui si può dare un colore (sezione "colori:")
 const PDC_COLORI = [
+  'fotovoltaico', 'inverter', 'batteria', 'rete_elettrica', 'casa',
   'esterno', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo',
   'ingresso_accumulo', 'circolatore', 'pavimento', 'rete', 'acqua_fredda', 'stop', 'contatore', 'puffer',
   'autoclave', 'ricircolo', 'rubinetto',
 ];
 
+// Sezione energia (sopra l'impianto)
+const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza'];
+
 const PDC_ENTITY_KEYS = [
+  ...PDC_ENERGY_KEYS,
   'temperatura_esterna', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'accumulo_temperatura', 'accumulo_ingresso',
   'circolatore', 'pavimento_mandata', 'pavimento_ritorno', 'acqua_valvola', 'acqua_portata',
   'acqua_totale', 'acqua_oggi', 'ricircolo', 'autoclave_velocita', 'autoclave_pressione',
   'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'acs_setpoint', 'accumulo_setpoint',
 ];
+const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k));
+
+// Esempio con dati finti ("demo: true" senza entità): anteprima nella scelta delle card
+const PDC_DEMO = {
+  fv_potenza: ['sensor', 3.2, 'kW'],
+  inverter_1_potenza: ['sensor', 1.3, 'kW'],
+  inverter_2_potenza: ['sensor', 1.9, 'kW'],
+  batteria_livello: ['sensor', 78, '%'],
+  batteria_potenza: ['sensor', -0.6, 'kW'],
+  rete_potenza: ['sensor', 0.02, 'kW'],
+  casa_potenza: ['sensor', 2.62, 'kW'],
+  rete_stato: ['binary_sensor', 'on'],
+  u_pdc: ['sensor', 1.8, 'kW'],
+  u_autoclave: ['sensor', 450, 'W'],
+  u_lavatrice: ['sensor', 0.12, 'kW'],
+  temperatura_esterna: ['sensor', 6.5, '°C'],
+  pdc_potenza: ['sensor', 1.8, 'kW'],
+  riscaldamento: ['binary_sensor', 'on'],
+  raffrescamento: ['binary_sensor', 'off'],
+  acs_potenza: ['sensor', 0, 'kW'],
+  pdc_mandata: ['sensor', 36.5, '°C'],
+  pdc_ritorno: ['sensor', 31.2, '°C'],
+  acs_temperatura: ['sensor', 49.5, '°C'],
+  acs_setpoint: ['sensor', 52, '°C'],
+  accumulo_temperatura: ['sensor', 34, '°C'],
+  accumulo_ingresso: ['sensor', 35.8, '°C'],
+  accumulo_setpoint: ['sensor', 35, '°C'],
+  circolatore: ['binary_sensor', 'on'],
+  pavimento_mandata: ['sensor', 33.5, '°C'],
+  pavimento_ritorno: ['sensor', 29, '°C'],
+  acqua_valvola: ['switch', 'on'],
+  acqua_portata: ['sensor', 8.4, 'L/min'],
+  acqua_oggi: ['sensor', 186, 'L'],
+  ricircolo: ['switch', 'on'],
+  autoclave_velocita: ['sensor', 3780, 'rpm'],
+  autoclave_pressione: ['sensor', 2.9, 'bar'],
+  autoclave_portata: ['sensor', 7.9, 'L/min'],
+  autoclave_stato: ['sensor', 'In funzione'],
+};
+const PDC_DEMO_ENT = {};
+const PDC_DEMO_STATES = {};
+for (const [k, [dom, state, unit]] of Object.entries(PDC_DEMO)) {
+  const id = `${dom}.pdc_esempio_${k}`;
+  if (!k.startsWith('u_')) PDC_DEMO_ENT[k] = id;
+  PDC_DEMO_STATES[id] = { entity_id: id, state: String(state), attributes: unit ? { unit_of_measurement: unit } : {} };
+}
+const PDC_DEMO_UTENZE = [
+  { entity: 'sensor.pdc_esempio_u_pdc', nome: 'Pompa di calore', icona: 'mdi:heat-pump' },
+  { entity: 'sensor.pdc_esempio_u_autoclave', nome: 'Autoclave', icona: 'mdi:water-pump' },
+  { entity: 'sensor.pdc_esempio_u_lavatrice', nome: 'Lavatrice', icona: 'mdi:washing-machine' },
+];
+
+// Utenze elettriche: colori predefiniti, a rotazione
+const PDC_U_COLORS = ['#d0cc5b', '#964cb5', '#b54c9d', '#5bd0cc', '#e57373', '#81c784', '#64b5f6', '#ffb74d'];
+// Icona di riserva (mdi:flash) se l'icona di Home Assistant non si può caricare
+const PDC_ICON_FALLBACK = 'M7,2V13H10V22L17,10H13L17,2H7Z';
+const PDC_ICON_CACHE = new Map();
+
+// Legge il disegno di un'icona mdi da <ha-icon> di Home Assistant (null se non disponibile)
+function pdcLoadIcon(icon) {
+  if (!icon) return Promise.resolve(null);
+  if (PDC_ICON_CACHE.has(icon)) return PDC_ICON_CACHE.get(icon);
+  const p = new Promise((resolve) => {
+    const start = () => {
+      const el = document.createElement('ha-icon');
+      el.style.cssText = 'position:absolute;left:-9999px;top:0;width:24px;height:24px;visibility:hidden;pointer-events:none';
+      el.icon = icon;
+      document.body.appendChild(el);
+      let n = 0;
+      const tick = () => {
+        const svgIcon = el.shadowRoot && el.shadowRoot.querySelector('ha-svg-icon');
+        const path = el._path || (svgIcon && svgIcon.path);
+        if (path || ++n > 40) {
+          el.remove();
+          resolve(path || null);
+        } else setTimeout(tick, 75);
+      };
+      tick();
+    };
+    if (customElements.get('ha-icon')) start();
+    else {
+      const t = setTimeout(() => resolve(null), 3000);
+      customElements.whenDefined('ha-icon').then(() => {
+        clearTimeout(t);
+        start();
+      });
+    }
+  });
+  PDC_ICON_CACHE.set(icon, p);
+  return p;
+}
+
+// Utenze dalla configurazione (accetta anche le chiavi di power-flow-card-plus)
+function pdcUtenze(config) {
+  const list = Array.isArray(config.utenze) ? config.utenze : [];
+  return list
+    .filter((u) => u && typeof u === 'object' && u.entity)
+    .map((u) => ({
+      entity: String(u.entity),
+      nome: u.nome !== undefined ? u.nome : u.name,
+      icona: u.icona || u.icon,
+      colore: u.colore !== undefined ? u.colore : u.color,
+      nascondi: u.nascondi_a_zero !== undefined ? !!u.nascondi_a_zero : u.display_zero === false,
+      soglia: u.soglia !== undefined ? u.soglia : u.display_zero_tolerance,
+      unita: u.unita || u.unit_of_measurement,
+    }));
+}
 
 const PDC_COL = {
   heat: '#ff7043',
@@ -77,6 +208,12 @@ const PDC_COL = {
   cold: '#4fc3f7',
   open: '#66bb6a',
   closed: '#ef5350',
+  solar: '#ff9800',
+  batt: '#f06292',
+  gridIn: '#488fc2',
+  gridOut: '#a280db',
+  home: '#4db6ac',
+  island: '#ffa726',
 };
 
 // Colori del tema di Home Assistant (con il valore predefinito come riserva)
@@ -127,8 +264,21 @@ const PDC_FLOWS = {
   wa: 'M44 470 H181',
   wb: 'M181 470 H331',
   wout: 'M331 470 H366',
-  whot: 'M331 230 V470',
+  whot: 'M331 230 V426',
+  // energia (coordinate della sezione energia)
+  e_fv: 'M150 78 V160',
+  e_inv1a: 'M122 78 V96',
+  e_inv1b: 'M122 132 C122 148 134 160 150 160',
+  e_inv2a: 'M178 78 V96',
+  e_inv2b: 'M178 132 C178 148 166 160 150 160',
+  e_bat: 'M150 186 V160',
+  e_grid: 'M74 160 H150',
+  e_casa: 'M150 160 H216',
 };
+
+// Sezione energia: altezza minima e posizione delle utenze
+const PDC_EH = 266;
+const PDC_U = { from: 272, icon: 322, r: 13, text: 341, row: 34, bus: 160 };
 
 const pdcFlow = (id) =>
   `<g class="flow" id="f-${id}"><path class="pipe" d="${PDC_FLOWS[id]}"/><path class="dots" d="${PDC_FLOWS[id]}"/></g>`;
@@ -136,8 +286,94 @@ const pdcFlow = (id) =>
 const PDC_BLADE = 'M63 90 C57 81 60 69 70 66 C75 76 72 85 63 90 Z';
 const PDC_IMP = 'M236 470 C233 466 234 461 238 459.5 C240.5 463.5 239.5 467.5 236 470 Z';
 
+const PDC_SVG_ENERGY = `
+<svg id="sv-e" x="0" y="0" width="420" height="${PDC_EH}" viewBox="0 0 420 ${PDC_EH}">
+  <defs>
+    <clipPath id="cp-batt"><rect x="128" y="190" width="44" height="62" rx="9"/></clipPath>
+  </defs>
+  <text x="18" y="24" class="sec" id="n-sezione_energia">ENERGIA</text>
+
+  ${pdcFlow('e_fv')}
+  ${pdcFlow('e_inv1a')}
+  ${pdcFlow('e_inv1b')}
+  ${pdcFlow('e_inv2a')}
+  ${pdcFlow('e_inv2b')}
+  ${pdcFlow('e_bat')}
+  ${pdcFlow('e_grid')}
+  ${pdcFlow('e_casa')}
+  <g id="g-uflows"></g>
+  <circle id="jn-e" class="jn" cx="150" cy="160" r="3.6"/>
+
+  <!-- Fotovoltaico: pannello e sole -->
+  <g id="g-fv" class="clickable" data-key="fv_potenza|inverter_1_potenza|inverter_2_potenza">
+    <circle class="sunc" cx="222" cy="28" r="7"/>
+    <path class="rays" d="M222 15 V18 M222 38 V41 M209 28 H212 M232 28 H235 M212.8 18.8 L214.9 20.9 M229.1 35.1 L231.2 37.2 M212.8 37.2 L214.9 35.1 M229.1 20.9 L231.2 18.8"/>
+    <path class="panel" d="M102 78 L114 38 H198 L186 78 Z"/>
+    <path class="pgrid" d="M130 78 L142 38 M158 78 L170 38 M108 58 H192"/>
+    <text x="96" y="54" class="lbl e" id="n-fotovoltaico">Fotovoltaico</text>
+    <text x="96" y="70" class="val e" id="t-fv">—</text>
+  </g>
+
+  <!-- Inverter sotto il pannello -->
+  <g id="g-inv1" class="clickable" data-key="inverter_1_potenza">
+    <rect class="box" x="100" y="96" width="44" height="36" rx="8"/>
+    <path class="isym" d="M104 129 L140 99"/>
+    <path class="isym" d="M106 104 H116 M106 108 H116"/>
+    <path class="isym wave" d="M125 124 q2.5 -4 5 0 t5 0"/>
+    <text x="94" y="110" class="lbl e" id="n-inverter_1">Inverter 1</text>
+    <text x="94" y="125" class="tv e" id="t-inv1">—</text>
+  </g>
+  <g id="g-inv2" class="clickable" data-key="inverter_2_potenza">
+    <rect class="box" x="156" y="96" width="44" height="36" rx="8"/>
+    <path class="isym" d="M160 129 L196 99"/>
+    <path class="isym" d="M162 104 H172 M162 108 H172"/>
+    <path class="isym wave" d="M181 124 q2.5 -4 5 0 t5 0"/>
+    <text x="206" y="110" class="lbl" id="n-inverter_2">Inverter 2</text>
+    <text x="206" y="125" class="tv" id="t-inv2">—</text>
+  </g>
+
+  <!-- Rete elettrica: traliccio -->
+  <g id="g-grid" class="clickable" data-key="rete_potenza|rete_stato">
+    <rect class="box" x="18" y="130" width="56" height="60" rx="12"/>
+    <path class="tower" d="M46 136 L36 184 M46 136 L56 184 M32 144 H60 M35 153 H57 M41 160 L53.5 172 M51 160 L38.5 172 M38.5 172 L56 184 M53.5 172 L36 184"/>
+    <path class="ins" d="M32 144 v3 M60 144 v3 M35 153 v3 M57 153 v3"/>
+    <text x="46" y="206" class="lbl c" id="n-rete_elettrica">Rete</text>
+    <text x="46" y="220" class="tv c" id="t-grid">—</text>
+    <text x="46" y="232" class="lbl c xs" id="t-grid-dir"></text>
+  </g>
+
+  <!-- Batteria di accumulo (sotto) -->
+  <g id="g-batt" class="clickable" data-key="batteria_livello|batteria_potenza">
+    <rect class="bterm" x="142" y="186" width="16" height="4" rx="1.5"/>
+    <rect class="tank" x="128" y="190" width="44" height="62" rx="9"/>
+    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="128" y="252" width="44" height="0"/>
+    <rect class="tank-o" x="128" y="190" width="44" height="62" rx="9"/>
+    <path class="bbolt" id="b-bolt" d="M152 198 L145 209 H150 L148 218 L155 207 H150 Z"/>
+    <text x="150" y="240" class="mval c" id="t-soc"></text>
+    <text x="120" y="206" class="lbl e" id="n-batteria">Batteria</text>
+    <text x="120" y="220" class="tv e" id="t-batt">—</text>
+    <text x="120" y="232" class="lbl e xs" id="t-batt-dir"></text>
+  </g>
+
+  <!-- Casa: da qui escono le utenze -->
+  <g id="g-casa" class="clickable" data-key="casa_potenza">
+    <rect class="box" x="216" y="130" width="56" height="60" rx="12"/>
+    <path class="roof" d="M224 158 L244 140 L264 158 Z"/>
+    <path class="ico2" d="M256 150.8 V142 H260 V154.4 M228 158 V182 H260 V158 M240 182 V171 H248 V182"/>
+    <rect class="win" x="250" y="163" width="7" height="7" rx="1"/>
+    <text x="244" y="206" class="lbl c" id="n-casa">Casa</text>
+    <text x="244" y="220" class="tv c" id="t-casa">—</text>
+  </g>
+
+  <g id="g-utenze"></g>
+
+  <line class="div" id="div-e" x1="18" y1="${PDC_EH - 1}" x2="406" y2="${PDC_EH - 1}"/>
+</svg>`;
+
 const PDC_SVG = `
-<svg viewBox="0 0 420 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schema pompa di calore e acqua sanitaria">
+<svg class="root" viewBox="0 0 420 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schema energia, pompa di calore e acqua sanitaria">
+${PDC_SVG_ENERGY}
+<svg id="sv-m" x="0" y="0" width="420" height="540" viewBox="0 0 420 540">
   <defs>
     <clipPath id="cp-boiler"><rect x="258" y="50" width="146" height="180" rx="24"/></clipPath>
     <clipPath id="cp-accu"><rect x="156" y="196" width="88" height="80" rx="18"/></clipPath>
@@ -153,7 +389,7 @@ const PDC_SVG = `
   </g>
   <text x="210" y="96" class="lbl c" id="t-empty">Scegli le entità dall'editor della card</text>
 
-  <line class="div" id="div-a" x1="18" y1="322" x2="406" y2="322"/>
+  <line class="div" id="div-a" x1="18" y1="316" x2="406" y2="316"/>
 
   <!-- Bollitore -->
   <g id="g-boiler" class="clickable" data-key="acs_temperatura">
@@ -243,12 +479,14 @@ const PDC_SVG = `
   </g>
 
   <!-- ===== SEZIONE ACQUA SANITARIA ===== -->
-  <text x="18" y="346" class="sec" id="n-sezione_acqua">ACQUA SANITARIA</text>
+  <text x="18" y="340" class="sec" id="n-sezione_acqua">ACQUA SANITARIA</text>
+  ${pdcFlow('whot')}
 
+  <!-- Contenuto dell'acqua spostato 44 più in alto (stesse coordinate di prima) -->
+  <svg id="sv-w" x="0" y="-44" width="420" height="540" viewBox="0 0 420 540">
   ${pdcFlow('wa')}
   ${pdcFlow('wb')}
   ${pdcFlow('wout')}
-  ${pdcFlow('whot')}
   <circle id="jn-w" class="jn" cx="331" cy="470" r="3.2"/>
 
   <!-- Ricircolo: pompa sulla linea che scende dal bollitore -->
@@ -313,6 +551,8 @@ const PDC_SVG = `
     <path class="drip" d="M392 478 C393.5 480 394 481 394 482 A2 2 0 0 1 390 482 C390 481 390.5 480 392 478 Z"/>
   </g>
   <text x="386" y="506" class="lbl c" id="n-rubinetto">Acqua</text>
+  </svg>
+</svg>
 </svg>`;
 
 const PDC_CSS = `
@@ -322,7 +562,7 @@ const PDC_CSS = `
   }
   ha-card { padding: 12px 10px 8px; overflow: hidden; }
   .wrap { width: 100%; }
-  svg { display: block; width: 100%; height: auto; font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, Roboto, sans-serif)); }
+  svg.root { display: block; width: 100%; height: auto; font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, Roboto, sans-serif)); }
   .clickable { cursor: pointer; }
   .hidden { display: none; }
 
@@ -371,40 +611,73 @@ const PDC_CSS = `
   .mring    { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1; stroke-dasharray: 2 3; opacity: .6; }
   .div      { stroke: var(--divider-color, rgba(127,127,127,.25)); stroke-width: 1; }
   .jn       { fill: var(--c, var(--pdc-idle)); }
+  .panel    { fill: var(--c, var(--pdc-idle)); fill-opacity: .18; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linejoin: round; }
+  .bolt     { fill: var(--c, var(--pdc-idle)); fill-opacity: .3; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; stroke-linejoin: round; }
+  .bterm    { fill: var(--c, var(--pdc-idle)); }
+  #fill-batt { fill-opacity: .4; }
+  .ubox { fill: var(--pdc-bg); stroke: var(--c, var(--pdc-idle)); stroke-width: 2; transition: stroke .5s; }
+  .pgrid { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.2; opacity: .8; }
+  .sunc  { fill: var(--c, var(--pdc-idle)); fill-opacity: .35; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; transition: fill-opacity .5s; }
+  .rays  { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.8; stroke-linecap: round; opacity: .35;
+           transform-box: view-box; transform-origin: 222px 28px; transition: opacity .5s; }
+  .run .rays { opacity: 1; animation: pdc-spin 14s linear infinite; }
+  .run .sunc { fill-opacity: .8; }
+  .isym  { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tower { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .ins   { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 2.6; stroke-linecap: round; }
+  .roof  { fill: var(--c, var(--pdc-idle)); fill-opacity: .28; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linejoin: round; }
+  .win   { fill: var(--c, var(--pdc-idle)); fill-opacity: 0; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.2; transition: fill-opacity .5s; }
+  .run .win { fill-opacity: .7; }
+  .bbolt { fill: var(--c, var(--pdc-idle)); fill-opacity: .9; opacity: 0; transition: opacity .4s; }
+  .bbolt.on { opacity: 1; }
+  .uico { fill: var(--c, var(--pdc-idle)); }
 
   .flow .pipe { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 2.2; stroke-linejoin: round; opacity: .3; transition: opacity .5s, stroke .5s; }
   .flow.on .pipe { opacity: .9; }
   .flow .dots { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0.1 26; opacity: 0; transition: opacity .4s; }
   .flow.on .dots { opacity: 1; animation: pdc-flow var(--dur, 1.6s) linear infinite; }
+  .flow.rev .dots { animation-direction: reverse; }
 
   @keyframes pdc-flow  { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -26.1; } }
   @keyframes pdc-spin  { to { transform: rotate(360deg); } }
   @keyframes pdc-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 4; } }
 
   @media (prefers-reduced-motion: reduce) {
-    .flow.on .dots, .run .fan, .run .imp, .run .pring { animation: none; }
+    .flow.on .dots, .run .fan, .run .imp, .run .pring, .run .rays { animation: none; }
   }
 `;
 
 class PdcFlowCard extends HTMLElement {
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('pdc-flow-card: configurazione non valida');
-    this._config = { soglia_pdc: 0.1, soglia_acs: 0.1, ...config, entities: { ...(config.entities || {}) } };
+    this._config = { soglia_pdc: 0.1, soglia_acs: 0.1, soglia_energia: 0.1, ...config, entities: { ...(config.entities || {}) } };
+    // Esempio: solo finché non c'è nessuna entità impostata
+    this._demo = config.demo === true && !PDC_ENTITY_KEYS.some((k) => this._config.entities[k]) && !pdcUtenze(config).length;
+    if (this._demo) {
+      this._config.entities = { ...PDC_DEMO_ENT };
+      this._config.utenze = PDC_DEMO_UTENZE;
+    }
+    // "gateway_stato_rete" (v0.14.0) = "rete_stato"
+    if (this._config.entities.gateway_stato_rete && !this._config.entities.rete_stato) {
+      this._config.entities.rete_stato = this._config.entities.gateway_stato_rete;
+    }
+    this._utenze = pdcUtenze(this._config);
     this._built = false;
-    if (this._hass) this._render();
+    if (this._rawHass) this.hass = this._rawHass;
   }
 
   set hass(hass) {
-    this._hass = hass;
+    this._rawHass = hass;
+    this._hass = this._demo ? { ...hass, states: PDC_DEMO_STATES } : hass;
     this._render();
   }
 
   getCardSize() {
-    return 8;
+    return Math.max(3, Math.round((this._vbH || 540) / 60));
   }
 
   static getStubConfig() {
-    return { entities: {} };
+    return { demo: true, entities: {} };
   }
 
   static getConfigElement() {
@@ -423,13 +696,47 @@ class PdcFlowCard extends HTMLElement {
     const t = this._config.title ? String(this._config.title).replace(/[<>&"]/g, '') : '';
     this.shadowRoot.innerHTML =
       `<style>${PDC_CSS}</style><ha-card${t ? ` header="${t}"` : ''}><div class="wrap">${PDC_SVG}</div></ha-card>`;
+    this._buildUtenze();
     this._els = {};
     this.shadowRoot.querySelectorAll('[id]').forEach((el) => (this._els[el.id] = el));
     this._svg = this.shadowRoot.querySelector('svg');
+    this._eH = null;
     this._svg.addEventListener('click', (ev) => this._click(ev));
     this._vbH = null;
     this._applyNames();
     this._built = true;
+  }
+
+  // Una riga per utenza: icona, nome, valore e i pallini dalla casa all'utenza
+  _buildUtenze() {
+    const U = PDC_U;
+    const NS = 'http://www.w3.org/2000/svg';
+    const rows = this.shadowRoot.getElementById('g-utenze');
+    const flows = this.shadowRoot.getElementById('g-uflows');
+    const mk = (tag, attrs, parent) => {
+      const el = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      parent.appendChild(el);
+      return el;
+    };
+    this._utenze.forEach((u, i) => {
+      // linea dalla casa all'utenza: ognuna ha la sua, così ognuna ha la sua velocità
+      const f = mk('g', { id: `f-u${i}`, class: 'flow' }, flows);
+      mk('path', { class: 'pipe', d: '' }, f);
+      mk('path', { class: 'dots', d: '' }, f);
+      const g = mk('g', { id: `u${i}`, class: 'clickable', 'data-entity': u.entity }, rows);
+      mk('circle', { class: 'ubox', cx: U.icon, cy: 0, r: U.r }, g);
+      const k = (U.r * 1.25) / 24;
+      const ico = mk('path', { id: `u${i}-ico`, class: 'uico', d: PDC_ICON_FALLBACK, transform: `translate(${U.icon - 12 * k} ${-12 * k}) scale(${k})` }, g);
+      const n = mk('text', { id: `u${i}-n`, class: 'lbl sm', x: U.text, y: -3 }, g);
+      mk('text', { id: `u${i}-v`, class: 'tv xs', x: U.text, y: 10 }, g);
+      const st = this._hass && this._hass.states[u.entity];
+      let name = u.nome !== undefined && u.nome !== null ? String(u.nome) : (st && st.attributes.friendly_name) || u.entity;
+      if (name.length > 15) name = name.slice(0, 14) + '…';
+      n.textContent = name;
+      const icon = u.icona || (st && st.attributes.icon);
+      if (icon) pdcLoadIcon(icon).then((d) => d && ico.setAttribute('d', d));
+    });
   }
 
   // Nomi personalizzati (sezione "nomi:")
@@ -458,10 +765,14 @@ class PdcFlowCard extends HTMLElement {
   }
 
   _click(ev) {
-    const node = ev.composedPath().find((n) => n.getAttribute && n.getAttribute('data-key'));
+    if (this._demo) return;
+    const node = ev.composedPath().find((n) => n.getAttribute && (n.getAttribute('data-key') || n.getAttribute('data-entity')));
     if (!node) return;
-    const key = node.getAttribute('data-key').split('|').find((k) => this._ids(k).length);
-    const id = key ? this._ids(key)[0] : null;
+    let id = node.getAttribute('data-entity');
+    if (!id) {
+      const key = node.getAttribute('data-key').split('|').find((k) => this._ids(k).length);
+      id = key ? this._ids(key)[0] : null;
+    }
     if (!id) return;
     const e = new Event('hass-more-info', { bubbles: true, composed: true });
     e.detail = { entityId: id };
@@ -579,13 +890,14 @@ class PdcFlowCard extends HTMLElement {
   }
 
   // ---------- helper grafici ----------
-  _flow(id, on, color, dur) {
+  _flow(id, on, color, dur, rev = false) {
     const g = this._els['f-' + id];
     if (!g) return;
     g.classList.toggle('on', !!on);
+    g.classList.toggle('rev', !!rev);
     if (color) g.style.setProperty('--c', color);
     else g.style.removeProperty('--c');
-    const d = (Math.round(dur * 5) / 5).toFixed(1) + 's';
+    const d = (Math.round(dur * 10) / 10).toFixed(1) + 's';
     if (g._dur !== d) {
       g.style.setProperty('--dur', d);
       g._dur = d;
@@ -651,7 +963,15 @@ class PdcFlowCard extends HTMLElement {
     const STOP = has('acqua_valvola') || has('acqua_stop');
     const RIC = has('ricircolo');
     const WATER = STOP || METER || OGGI || RIC || PUFFER;
-    const ANY = PDC_ENTITY_KEYS.some((k) => has(k));
+    const ANY = PDC_MAIN_KEYS.some((k) => has(k));
+    const INV1 = has('inverter_1_potenza');
+    const INV2 = has('inverter_2_potenza');
+    const FV = has('fv_potenza') || INV1 || INV2;
+    const BATT = has('batteria_potenza') || has('batteria_livello');
+    const GRID = has('rete_potenza');
+    const HOME = has('casa_potenza');
+    const EN = FV || BATT || GRID || HOME || has('rete_stato') || this._utenze.length > 0;
+    const MAIN = ANY || !EN;
 
     // ---- Valori ----
     const tExt = this._num('temperatura_esterna');
@@ -730,7 +1050,10 @@ class PdcFlowCard extends HTMLElement {
 
     // ---- Visibilità: un componente compare solo se ha la sua entità ----
     const showS1 = PDC && (BOIL || ACCU);
-    this._vis(['t-empty'], !ANY);
+    this._vis(['t-empty'], !ANY && !EN);
+    this._vis(['sv-e'], EN);
+    this._vis(['sv-m'], MAIN);
+    this._vis(['div-e'], EN && MAIN);
     this._vis(['n-sezione_impianto'], ANY);
     this._vis(['g-ext'], has('temperatura_esterna'));
     this._vis(['g-pdc', 't-pdc-pow', 't-pdc-mode', 'n-pompa_di_calore'], PDC);
@@ -762,9 +1085,164 @@ class PdcFlowCard extends HTMLElement {
       this._els['f-r2b'].querySelectorAll('path').forEach((p) => p.setAttribute('d', r2b));
       this._r2b = r2b;
     }
-    const h = !ANY ? 190 : WATER ? 540 : 318;
+    // L'acqua sale ancora di 24 se sotto il pavimento non ci sono le temperature
+    const wUp = FTEMPS ? 0 : 24;
+    if (this._wUp !== wUp) {
+      this._els['div-a'].setAttribute('y1', 316 - wUp);
+      this._els['div-a'].setAttribute('y2', 316 - wUp);
+      this._els['n-sezione_acqua'].setAttribute('y', 340 - wUp);
+      this._els['sv-w'].setAttribute('y', -44 - wUp);
+      this._els['f-whot'].querySelectorAll('path').forEach((pth) => pth.setAttribute('d', `M331 230 V${426 - wUp}`));
+      this._wUp = wUp;
+    }
+    const hm = !ANY ? 190 : WATER ? 496 - wUp : FTEMPS ? 318 : 294;
+
+    // ---- Energia ----
+    // Velocità dei pallini: più potenza = più veloci (da 3,2 s a 0,3 s per tratto)
+    const durE = (kw) => Math.min(3.2, Math.max(0.3, 3.2 / (1 + 1.1 * Math.abs(kw || 0))));
+    const sE = Number(c.soglia_energia) || 0;
+    const pInv1 = this._kw('inverter_1_potenza');
+    const pInv2 = this._kw('inverter_2_potenza');
+    let pFv = this._kw('fv_potenza');
+    if (pFv === null && (pInv1 !== null || pInv2 !== null)) pFv = (pInv1 || 0) + (pInv2 || 0);
+    let pBat = this._kw('batteria_potenza');
+    if (pBat !== null && c.batteria_inverti) pBat = -pBat;
+    let pGrid = this._kw('rete_potenza');
+    if (pGrid !== null && c.rete_inverti) pGrid = -pGrid;
+    const pHome = this._kw('casa_potenza');
+    const soc = this._num('batteria_livello');
+    const fmtP = (v) => (v === null ? '—' : Math.abs(v) < 1 ? f0(Math.abs(v) * 1000) + ' W' : f1(Math.abs(v)) + ' kW');
+    // la soglia serve per rete e batteria, che oscillano; produzione e consumi si vedono da 10 W
+    const fvOn = pFv !== null && pFv > 0.01;
+    const inv1On = pInv1 !== null && pInv1 > 0.01;
+    const inv2On = pInv2 !== null && pInv2 > 0.01;
+    const batDis = pBat !== null && pBat > sE;
+    const batChg = pBat !== null && pBat < -sE;
+    const gridIn = pGrid !== null && pGrid > sE;
+    const gridOut = pGrid !== null && pGrid < -sE;
+    const homeOn = pHome !== null ? pHome > 0.01 : fvOn || batDis || gridIn;
+    const gridState = this._on('rete_stato'); // true = rete collegata
+    const gridDown = gridState === false;
+    const cFv = col('fotovoltaico', PDC_COL.solar);
+    const cInv = col('inverter', cFv);
+    const cBat = col('batteria', PDC_COL.batt);
+    const cGrid = gridOut ? col('rete_elettrica', PDC_COL.gridOut) : col('rete_elettrica', PDC_COL.gridIn);
+    const cHome = col('casa', PDC_COL.home);
+    const HOUSE = HOME || this._utenze.length > 0;
+
+    this._vis(['g-fv'], FV);
+    this._vis(['f-e_fv'], FV && !INV1 && !INV2);
+    this._vis(['g-inv1', 'f-e_inv1a', 'f-e_inv1b'], INV1);
+    this._vis(['g-inv2', 'f-e_inv2a', 'f-e_inv2b'], INV2);
+    this._vis(['g-batt', 'f-e_bat'], BATT);
+    this._vis(['g-grid', 'f-e_grid'], GRID || has('rete_stato'));
+    this._vis(['g-casa', 'f-e_casa'], HOUSE);
+    this._vis(['jn-e'], [FV, BATT, GRID, HOUSE].filter(Boolean).length >= 3);
+
+    this._color('g-fv', fixed('fotovoltaico') || (fvOn ? cFv : null));
+    this._els['g-fv'].classList.toggle('run', fvOn);
+    this._text('t-fv', fmtP(pFv), fvOn ? cFv : '');
+    this._flow('e_fv', fvOn, cFv, durE(pFv));
+    this._color('g-inv1', fixed('inverter') || (inv1On ? cInv : null));
+    this._text('t-inv1', fmtP(pInv1), inv1On ? cInv : '');
+    this._flow('e_inv1a', inv1On, cFv, durE(pInv1));
+    this._flow('e_inv1b', inv1On, cInv, durE(pInv1));
+    this._color('g-inv2', fixed('inverter') || (inv2On ? cInv : null));
+    this._text('t-inv2', fmtP(pInv2), inv2On ? cInv : '');
+    this._flow('e_inv2a', inv2On, cFv, durE(pInv2));
+    this._flow('e_inv2b', inv2On, cInv, durE(pInv2));
+
+    this._color('g-batt', cBat);
+    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 190, 62, cBat);
+    this._text('t-soc', soc === null ? '' : f0(soc) + '%');
+    this._els['b-bolt'].classList.toggle('on', batChg);
+    this._text('t-batt', pBat === null ? '—' : fmtP(pBat), batDis || batChg ? cBat : '');
+    this._text('t-batt-dir', batChg ? 'in carica' : batDis ? 'in scarica' : '');
+    this._flow('e_bat', batDis || batChg, cBat, durE(pBat), batChg);
+
+    this._color('g-grid', gridDown ? PDC_COL.island : fixed('rete_elettrica') || (gridIn || gridOut ? cGrid : null));
+    this._text('t-grid', fmtP(pGrid), gridIn || gridOut ? cGrid : '');
+    this._text('t-grid-dir', gridDown ? 'staccata' : gridIn ? 'prelievo' : gridOut ? 'immissione' : '', gridDown ? PDC_COL.island : '');
+    this._flow('e_grid', gridIn || gridOut, cGrid, durE(pGrid), gridOut);
+
+    this._color('g-casa', fixed('casa') || (homeOn ? cHome : null));
+    this._els['g-casa'].classList.toggle('run', homeOn);
+    this._text('t-casa', fmtP(pHome), homeOn ? cHome : '');
+    this._flow('e_casa', homeOn, cHome, durE(pHome));
+    this._color('jn-e', homeOn || fvOn || batDis || batChg || gridIn || gridOut ? 'var(--secondary-text-color)' : null);
+
+    // Utenze: una linea per utenza dalla casa; quelle "nascondi_a_zero" spente spariscono
+    const U = PDC_U;
+    const shown = [];
+    const state = [];
+    this._utenze.forEach((u, i) => {
+      const st = this._hass.states[u.entity];
+      const unit = String(u.unita || (st && st.attributes.unit_of_measurement) || '');
+      const raw = st ? parseFloat(st.state) : NaN;
+      const lim = u.soglia !== undefined && u.soglia !== null && u.soglia !== '' && !isNaN(u.soglia) ? Number(u.soglia) : null;
+      let txt;
+      let on;
+      let kw = null;
+      if (['W', 'kW', 'MW'].includes(unit) && !isNaN(raw)) {
+        kw = unit === 'W' ? raw / 1000 : unit === 'MW' ? raw * 1000 : raw;
+        txt = fmtP(kw);
+        on = lim !== null ? raw > lim : kw > 0.01;
+      } else if (st && !isNaN(raw)) {
+        txt = !u.unita && typeof this._hass.formatEntityState === 'function'
+          ? this._hass.formatEntityState(st)
+          : (Number.isInteger(raw) ? f0(raw) : f1(raw)) + (unit ? (unit === '°' ? '' : ' ') + unit : '');
+        on = raw > (lim !== null ? lim : 0);
+      } else if (st) {
+        txt = typeof this._hass.formatEntityState === 'function' ? this._hass.formatEntityState(st) : String(st.state);
+        const l = String(st.state).toLowerCase();
+        on = !['unavailable', 'unknown', ''].includes(l) && !/(^|[._ ])(off|standby|idle|inactive|paused|none|spento|spenta)$/.test(l);
+      } else {
+        txt = '—';
+        on = false;
+      }
+      // Stati tipo "Xxx.EnumType.PowerState.Off": resta solo l'ultima parte; testi lunghi accorciati
+      if (/^[^\s]+\.[^\s]+$/.test(txt) && isNaN(parseFloat(txt))) txt = txt.split('.').pop();
+      if (txt.length > 16) txt = txt.slice(0, 15) + '…';
+      const cu = pdcCustomColor(u.colore) || PDC_U_COLORS[i % PDC_U_COLORS.length];
+      const visible = !(u.nascondi && !on);
+      this._show(`u${i}`, visible);
+      this._show(`f-u${i}`, visible);
+      this._color(`u${i}`, pdcCustomColor(u.colore) || (on ? cu : null));
+      this._text(`u${i}-v`, txt, on ? cu : '');
+      state[i] = { on, cu, kw };
+      if (visible) shown.push(i);
+    });
+    const n = shown.length;
+    const y0 = Math.max(40, U.bus - ((n - 1) * U.row) / 2);
+    const ys = shown.map((_, k) => Math.round(y0 + k * U.row));
+    shown.forEach((i, k) => {
+      const y = ys[k];
+      const x1 = U.icon - U.r;
+      this._els[`u${i}`].setAttribute('transform', `translate(0 ${y})`);
+      const d = `M${U.from} ${U.bus} C${U.from + 20} ${U.bus} ${x1 - 20} ${y} ${x1} ${y}`;
+      const g = this._els[`f-u${i}`];
+      if (g._d !== d) {
+        g.querySelectorAll('path').forEach((pth) => pth.setAttribute('d', d));
+        g._d = d;
+      }
+      const s = state[i];
+      this._flow(`u${i}`, s.on, s.on ? s.cu : null, s.kw !== null ? durE(s.kw) : 1.6);
+    });
+
+    // Altezze: energia (cresce con le utenze) + impianto/acqua
+    const eh = n ? Math.max(PDC_EH, ys[n - 1] + 26) : PDC_EH;
+    if (this._eH !== eh) {
+      const sv = this._els['sv-e'];
+      sv.setAttribute('height', eh);
+      sv.setAttribute('viewBox', `0 0 420 ${eh}`);
+      this._els['div-e'].setAttribute('y1', eh - 1);
+      this._els['div-e'].setAttribute('y2', eh - 1);
+      this._eH = eh;
+    }
+    const h = (EN ? eh : 0) + (MAIN ? hm : 0);
     if (this._vbH !== h) {
       this._svg.setAttribute('viewBox', `0 0 420 ${h}`);
+      this._els['sv-m'].setAttribute('y', EN ? eh : 0);
       this._vbH = h;
     }
 
@@ -954,6 +1432,17 @@ const PDC_ANY = { entity: {} };
 
 const PDC_FIELD_SELECTORS = {
   title: { text: {} },
+  fv_potenza: PDC_SENSOR,
+  inverter_1_potenza: PDC_SENSOR,
+  inverter_2_potenza: PDC_SENSOR,
+  batteria_livello: PDC_SENSOR,
+  batteria_potenza: PDC_SENSOR,
+  batteria_inverti: { boolean: {} },
+  rete_potenza: PDC_SENSOR,
+  rete_inverti: { boolean: {} },
+  casa_potenza: PDC_SENSOR,
+  rete_stato: PDC_ANY,
+  soglia_energia: { number: { min: 0, max: 2, step: 0.01, mode: 'box', unit_of_measurement: 'kW' } },
   temperatura_esterna: PDC_SENSOR,
   pdc_potenza: { entity: { domain: 'sensor', multiple: true } },
   riscaldamento: PDC_ANY,
@@ -999,7 +1488,11 @@ const PDC_FIELD_SELECTORS = {
 
 // [chiave, titolo, icona, campi]; "nome_x" e "colore_x" si riferiscono alle sezioni nomi/colori
 const PDC_GROUPS = [
-  ['generale', 'Generale', 'mdi:card-text-outline', ['title', 'nome_sezione_impianto', 'nome_sezione_acqua', 'nome_setpoint']],
+  ['generale', 'Generale', 'mdi:card-text-outline', ['title', 'nome_sezione_energia', 'nome_sezione_impianto', 'nome_sezione_acqua', 'nome_setpoint', 'soglia_energia']],
+  ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'nome_fotovoltaico', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter']],
+  ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'nome_batteria', 'colore_batteria']],
+  ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
+  ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'nome_casa', 'colore_casa']],
   ['esterno', 'Temperatura esterna', 'mdi:thermometer', ['temperatura_esterna', 'nome_esterno', 'colore_esterno', 'tcolora_esterno', 'tmin_esterno', 'tmax_esterno']],
   ['pompa_di_calore', 'Pompa di calore', 'mdi:heat-pump', ['pdc_potenza', 'riscaldamento', 'raffrescamento', 'soglia_pdc', 'nome_pompa_di_calore', 'colore_pompa_di_calore']],
   ['valvola_3_vie', 'Valvola 3 vie (ciclo ACS)', 'mdi:valve', ['acs_potenza', 'acs_attiva', 'soglia_acs', 'nome_valvola_3_vie', 'colore_valvola_3_vie']],
@@ -1019,7 +1512,7 @@ const PDC_GROUPS = [
   ['rubinetto', 'Rubinetto', 'mdi:faucet', ['nome_rubinetto', 'colore_rubinetto']],
 ];
 
-const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs'];
+const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti'];
 
 const PDC_TNUM = { number: { min: -30, max: 100, step: 1, mode: 'box', unit_of_measurement: '°C' } };
 
@@ -1031,17 +1524,69 @@ function pdcSelectorFor(field) {
   return PDC_FIELD_SELECTORS[field] || { text: {} };
 }
 
-const PDC_EDITOR_SCHEMA = PDC_GROUPS.map(([key, title, icon, fields]) => ({
+const pdcGroup = ([key, title, icon, fields]) => ({
   type: 'expandable',
   name: 'g_' + key,
   flatten: true,
   title,
   icon,
   schema: fields.map((f) => ({ name: f, selector: pdcSelectorFor(f) })),
-}));
+});
+
+// Campi di ogni utenza ("u0_entity", "u0_nome"...); dopo l'ultima c'è un gruppo vuoto per aggiungerne una
+const PDC_U_FIELDS = ['entity', 'nome', 'icona', 'colore', 'nascondi', 'soglia'];
+const PDC_U_SELECTORS = {
+  entity: { entity: {} },
+  nome: { text: {} },
+  icona: { icon: {} },
+  colore: { ui_color: { include_none: true } },
+  nascondi: { boolean: {} },
+  soglia: { number: { mode: 'box', step: 'any' } },
+};
+
+function pdcEditorSchema(config) {
+  const n = Array.isArray(config.utenze) ? config.utenze.length : 0;
+  const out = [];
+  for (const g of PDC_GROUPS) {
+    out.push(pdcGroup(g));
+    if (g[0] !== 'casa') continue;
+    for (let i = 0; i <= n; i++) {
+      const add = i === n;
+      out.push({
+        type: 'expandable',
+        name: 'g_u' + i,
+        flatten: true,
+        title: add ? 'Aggiungi utenza elettrica' : 'Utenza ' + (i + 1),
+        icon: add ? 'mdi:plus' : 'mdi:power-plug-outline',
+        schema: (add ? ['entity'] : PDC_U_FIELDS).map((f) => ({ name: `u${i}_${f}`, selector: PDC_U_SELECTORS[f] })),
+      });
+    }
+  }
+  return out;
+}
 
 const PDC_LABELS = {
   title: 'Titolo della card',
+  fv_potenza: 'Potenza prodotta (totale)',
+  inverter_1_potenza: 'Inverter 1: potenza',
+  inverter_2_potenza: 'Inverter 2: potenza',
+  nome_fotovoltaico: 'Nome pannelli',
+  nome_inverter_1: 'Nome inverter 1',
+  nome_inverter_2: 'Nome inverter 2',
+  colore_inverter: 'Colore inverter',
+  batteria_livello: 'Livello di carica (%)',
+  batteria_potenza: 'Potenza (positiva = in scarica)',
+  batteria_inverti: 'Segno invertito (positiva = in carica)',
+  rete_potenza: 'Potenza (positiva = prelievo dalla rete)',
+  rete_inverti: 'Segno invertito (positiva = immissione)',
+  rete_stato: 'Stato della rete (on = collegata)',
+  soglia_energia: 'Rete e batteria animate sopra',
+  casa_potenza: 'Consumo della casa',
+  nome_sezione_energia: 'Nome sezione energia',
+  colore_rete_elettrica: 'Colore icona e linea',
+  colore_fotovoltaico: 'Colore icona e linea',
+  colore_batteria: 'Colore batteria e linea',
+  colore_casa: 'Colore icona e linea',
   temperatura_esterna: 'Sensore temperatura',
   pdc_potenza: 'Potenza (uno o più sensori, vengono sommati)',
   riscaldamento: 'Modalità riscaldamento',
@@ -1122,6 +1667,8 @@ class PdcFlowCardEditor extends HTMLElement {
       this._form = document.createElement('ha-form');
       this._form.computeLabel = (sch) => {
         if (PDC_LABELS[sch.name]) return PDC_LABELS[sch.name];
+        const um = /^u\d+_(\w+)$/.exec(sch.name);
+        if (um) return { entity: 'Entità', nome: 'Nome', icona: 'Icona', colore: 'Colore', nascondi: 'Nascondi quando è spenta', soglia: 'Accesa sopra' }[um[1]];
         if (sch.name.startsWith('nome_')) return 'Nome';
         if (sch.name.startsWith('colore_')) return 'Colore icona';
         if (sch.name.startsWith('tcolora_')) return 'Colora nome, valore e icona con la temperatura';
@@ -1136,6 +1683,10 @@ class PdcFlowCardEditor extends HTMLElement {
           const d = PDC_TEMP_RANGE[sch.name.slice(5)] || [10, 55];
           return 'Predefinito: ' + (sch.name.startsWith('tmin_') ? d[0] : d[1]) + ' °C';
         }
+        if (sch.name === 'colore_rete_elettrica') return 'Nessuno = blu in prelievo, viola in immissione';
+        if (sch.name === 'rete_stato') return 'Se la rete si stacca, sotto la rete compare "staccata"';
+        if (/^u\d+_soglia$/.test(sch.name)) return "Nell'unità del sensore. Vuoto = potenze sopra 10 W, altri valori sopra 0";
+        if (/^u\d+_entity$/.test(sch.name)) return 'Potenza (W o kW) oppure un altro sensore: stato, percentuale…';
         if (sch.name === 'autoclave_comando') return 'Un select con le opzioni Abilita / Disabilita, oppure uno switch (off = bloccata)';
         return undefined;
       };
@@ -1149,7 +1700,11 @@ class PdcFlowCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.data = PdcFlowCardEditor.toForm(this._config);
-    this._form.schema = PDC_EDITOR_SCHEMA;
+    const nU = Array.isArray(this._config.utenze) ? this._config.utenze.length : 0;
+    if (this._schemaN !== nU) {
+      this._form.schema = pdcEditorSchema(this._config);
+      this._schemaN = nU;
+    }
   }
 
   // Dalla configurazione YAML ai campi piatti del form
@@ -1168,6 +1723,19 @@ class PdcFlowCardEditor extends HTMLElement {
     }
     for (const k of PDC_OPT_KEYS) if (config[k] !== undefined) d[k] = config[k];
     if (!d.acqua_portata_unita) d.acqua_portata_unita = 'auto';
+    if (!d.rete_stato && ent.gateway_stato_rete) d.rete_stato = ent.gateway_stato_rete;
+    (Array.isArray(config.utenze) ? config.utenze : []).forEach((u, i) => {
+      if (!u || typeof u !== 'object') return;
+      const v = {
+        entity: u.entity,
+        nome: u.nome !== undefined ? u.nome : u.name,
+        icona: u.icona || u.icon,
+        colore: u.colore !== undefined ? u.colore : u.color,
+        nascondi: u.nascondi_a_zero !== undefined ? !!u.nascondi_a_zero : u.display_zero === false ? true : undefined,
+        soglia: u.soglia !== undefined ? u.soglia : u.display_zero_tolerance,
+      };
+      for (const [k, x] of Object.entries(v)) if (x !== undefined && x !== null) d[`u${i}_${k}`] = x;
+    });
     return d;
   }
 
@@ -1181,6 +1749,7 @@ class PdcFlowCardEditor extends HTMLElement {
       else ent[k] = value[k];
     }
     cfg.entities = ent;
+    if (Object.keys(ent).length) delete cfg.demo;
 
     const nomi = {};
     for (const k of Object.keys(PDC_NOMI)) {
@@ -1216,7 +1785,33 @@ class PdcFlowCardEditor extends HTMLElement {
     }
     if (cfg.acqua_portata_unita === 'auto') delete cfg.acqua_portata_unita;
     if (!cfg.puffer) delete cfg.puffer;
+    if (!cfg.batteria_inverti) delete cfg.batteria_inverti;
+    if (!cfg.rete_inverti) delete cfg.rete_inverti;
     delete cfg.pulsanti;
+    delete cfg.entities.gateway_stato_rete;
+
+    // Utenze: l'ordine resta quello dell'elenco; svuotando l'entità l'utenza viene tolta
+    const old = Array.isArray(original.utenze) ? original.utenze : [];
+    const utenze = [];
+    for (let i = 0; i <= old.length; i++) {
+      const e = value[`u${i}_entity`];
+      if (empty(e)) continue;
+      const u = { ...(old[i] && typeof old[i] === 'object' ? old[i] : {}) };
+      for (const k of ['name', 'icon', 'color', 'display_zero', 'display_zero_tolerance', 'nascondi_a_zero', 'nome', 'icona', 'colore', 'soglia']) delete u[k];
+      u.entity = e;
+      const nome = value[`u${i}_nome`];
+      if (!empty(nome)) u.nome = nome;
+      if (!empty(value[`u${i}_icona`])) u.icona = value[`u${i}_icona`];
+      const colore = value[`u${i}_colore`];
+      if (!empty(colore) && colore !== 'none') u.colore = colore;
+      if (value[`u${i}_nascondi`] === true) u.nascondi_a_zero = true;
+      if (!empty(value[`u${i}_soglia`])) u.soglia = Number(value[`u${i}_soglia`]);
+      utenze.push(u);
+    }
+    if (utenze.length) {
+      cfg.utenze = utenze;
+      delete cfg.demo;
+    } else delete cfg.utenze;
     return cfg;
   }
 }
@@ -1232,7 +1827,7 @@ if (!customElements.get('pdc-flow-card')) {
     type: 'pdc-flow-card',
     name: 'PdC Flow Card',
     description: 'Schema animato pompa di calore e acqua sanitaria',
-    preview: false,
+    preview: true,
   });
   console.info(`%c PDC-FLOW-CARD %c v${PDC_VERSION} `, 'background:#ff7043;color:#fff', 'background:#333;color:#fff');
 }
