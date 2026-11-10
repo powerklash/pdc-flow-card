@@ -1,5 +1,8 @@
 # PdC Flow Card
 
+<img width="466" height="596" alt="image" src="https://github.com/user-attachments/assets/5752c015-54f7-42e3-ba2a-93d0e622390e" />
+
+
 Card per la dashboard di Home Assistant che disegna in modo animato una pompa di calore e l'acqua sanitaria di casa:
 
 - **Impianto:** temperatura esterna, pompa di calore, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
