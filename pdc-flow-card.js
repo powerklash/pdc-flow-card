@@ -38,10 +38,11 @@
  *   (autoclave_comando: select Abilita/Disabilita o switch; toccando l'autoclave si apre il suo comando)
  *   demo: true                 # facoltativo: dati di esempio finché non si imposta un'entità
  *   batteria_inverti / rete_inverti: true   # facoltativo: segno opposto della potenza
+ *   batteria_colora: true      # facoltativo: batteria da rosso (scarica) a verde (carica); batteria_min / batteria_max in %
  *   soglia_energia: 0.1        # facoltativo: kW sopra cui il flusso elettrico si anima
  */
 
-const PDC_VERSION = '0.16.0';
+const PDC_VERSION = '0.19.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -94,6 +95,30 @@ const PDC_ENTITY_KEYS = [
   'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'acs_setpoint', 'accumulo_setpoint',
 ];
 const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k));
+
+// Ordine delle chiavi nello YAML scritto dall'editor: energia, pompa di calore e impianto, acqua sanitaria
+const PDC_ENTITY_ORDER = [
+  'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'batteria_livello', 'batteria_potenza',
+  'rete_potenza', 'rete_stato', 'casa_potenza',
+  'temperatura_esterna', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
+  'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
+  'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
+  'acqua_valvola', 'acqua_stop', 'acqua_portata', 'acqua_totale', 'acqua_oggi',
+  'autoclave_velocita', 'autoclave_pressione', 'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'ricircolo',
+];
+const PDC_CONFIG_ORDER = [
+  'type', 'title', 'demo', 'entities', 'utenze',
+  'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max',
+  'soglia_pdc', 'soglia_acs', 'temperature',
+  'acqua_portata_unita', 'puffer',
+  'nomi', 'colori',
+];
+function pdcOrderConfig(cfg) {
+  const out = {};
+  for (const k of PDC_CONFIG_ORDER) if (cfg[k] !== undefined) out[k] = cfg[k];
+  for (const k of Object.keys(cfg)) if (!(k in out)) out[k] = cfg[k];
+  return out;
+}
 
 // Esempio con dati finti ("demo: true" senza entità): anteprima nella scelta delle card
 const PDC_DEMO = {
@@ -240,6 +265,14 @@ const PDC_TEMPS = ['esterno', 'mandata', 'ritorno', 'ingresso_accumulo', 'bollit
 const PDC_TEMP_RANGE = { esterno: [-5, 35] }; // le altre: 10–55 °C
 
 // Colore in base alla temperatura: celeste (min) → viola → rosa → rosso (max)
+// Colore della batteria in base alla carica: rosso (min) → arancio → giallo → verde brillante (max)
+function pdcSocColor(soc, min = 0, max = 100) {
+  if (soc === null || soc === undefined || isNaN(soc)) return null;
+  const span = max > min ? max - min : 100;
+  const k = Math.min(1, Math.max(0, (soc - min) / span));
+  return `hsl(${Math.round(k * 125)}, 90%, ${Math.round(56 - k * 8)}%)`;
+}
+
 function pdcTempColor(t, min = 10, max = 55) {
   if (t === null || t === undefined || isNaN(t)) return null;
   const span = max > min ? max - min : 45;
@@ -265,20 +298,33 @@ const PDC_FLOWS = {
   wb: 'M181 470 H331',
   wout: 'M331 470 H366',
   whot: 'M331 230 V426',
-  // energia (coordinate della sezione energia)
-  e_fv: 'M150 78 V160',
-  e_inv1a: 'M122 78 V96',
-  e_inv1b: 'M122 132 C122 148 134 160 150 160',
-  e_inv2a: 'M178 78 V96',
-  e_inv2b: 'M178 132 C178 148 166 160 150 160',
-  e_bat: 'M150 186 V160',
-  e_grid: 'M74 160 H150',
-  e_casa: 'M150 160 H216',
 };
 
 // Sezione energia: altezza minima e posizione delle utenze
-const PDC_EH = 266;
-const PDC_U = { from: 272, icon: 322, r: 13, text: 341, row: 34, bus: 160 };
+const PDC_EH = 296;
+// Utenze: cerchio con icona e valore dentro, nome a destra
+const PDC_U = { icon: 318, r: 19, text: 345, row: 46, bus: 180 };
+// Posizioni (centri) di rete, fotovoltaico/batteria e casa: con le utenze a destra, oppure su tutta la larghezza
+const PDC_E_LAYOUT = { utenze: { gx: 50, sx: 150, hx: 250 }, pieno: { gx: 56, sx: 210, hx: 362 } };
+// Linee dell'energia: ogni punto è collegato direttamente agli altri
+const PDC_E_FLOWS = ['e_fv', 'e_inv1a', 'e_inv1b', 'e_inv2a', 'e_inv2b', 'e_sg', 'e_sh', 'e_sb', 'e_gh', 'e_gb', 'e_bh'];
+const pdcFlowE = (id) => `<g class="flow thin" id="f-${id}"><path class="pipe" d=""/><path class="dots" d=""/></g>`;
+function pdcEnergyPaths({ gx, sx, hx }) {
+  const bx = sx;
+  return {
+    e_fv: `M${sx} 74 V134`,
+    e_inv1a: `M${sx - 30} 74 V88`,
+    e_inv2a: `M${sx + 30} 74 V88`,
+    e_inv1b: `M${sx - 30} 122 C${sx - 30} 130 ${sx - 12} 134 ${sx} 134`,
+    e_inv2b: `M${sx + 30} 122 C${sx + 30} 130 ${sx + 12} 134 ${sx} 134`,
+    e_sg: `M${sx - 6} 134 C${sx - 6} 162 ${gx + 56} 168 ${gx + 24} 168`,
+    e_sh: `M${sx + 6} 134 C${sx + 6} 162 ${hx - 58} 168 ${hx - 26} 168`,
+    e_sb: `M${sx} 134 V214`,
+    e_gh: `M${gx + 24} 180 H${hx - 26}`,
+    e_gb: `M${gx + 24} 192 C${gx + 64} 192 ${bx - 46} 249 ${bx - 24} 249`,
+    e_bh: `M${bx + 24} 249 C${bx + 46} 249 ${hx - 66} 192 ${hx - 26} 192`,
+  };
+}
 
 const pdcFlow = (id) =>
   `<g class="flow" id="f-${id}"><path class="pipe" d="${PDC_FLOWS[id]}"/><path class="dots" d="${PDC_FLOWS[id]}"/></g>`;
@@ -289,80 +335,70 @@ const PDC_IMP = 'M236 470 C233 466 234 461 238 459.5 C240.5 463.5 239.5 467.5 23
 const PDC_SVG_ENERGY = `
 <svg id="sv-e" x="0" y="0" width="420" height="${PDC_EH}" viewBox="0 0 420 ${PDC_EH}">
   <defs>
-    <clipPath id="cp-batt"><rect x="128" y="190" width="44" height="62" rx="9"/></clipPath>
+    <clipPath id="cp-batt"><rect x="-24" y="218" width="48" height="62" rx="10"/></clipPath>
   </defs>
   <text x="18" y="24" class="sec" id="n-sezione_energia">ENERGIA</text>
 
-  ${pdcFlow('e_fv')}
-  ${pdcFlow('e_inv1a')}
-  ${pdcFlow('e_inv1b')}
-  ${pdcFlow('e_inv2a')}
-  ${pdcFlow('e_inv2b')}
-  ${pdcFlow('e_bat')}
-  ${pdcFlow('e_grid')}
-  ${pdcFlow('e_casa')}
+  ${PDC_E_FLOWS.map(pdcFlowE).join('')}
   <g id="g-uflows"></g>
-  <circle id="jn-e" class="jn" cx="150" cy="160" r="3.6"/>
+  <circle id="jn-s" class="jn" cx="0" cy="134" r="3"/>
 
-  <!-- Fotovoltaico: pannello e sole -->
+  <!-- Fotovoltaico: pannello con il valore dentro, e sole -->
   <g id="g-fv" class="clickable" data-key="fv_potenza|inverter_1_potenza|inverter_2_potenza">
-    <circle class="sunc" cx="222" cy="28" r="7"/>
-    <path class="rays" d="M222 15 V18 M222 38 V41 M209 28 H212 M232 28 H235 M212.8 18.8 L214.9 20.9 M229.1 35.1 L231.2 37.2 M212.8 37.2 L214.9 35.1 M229.1 20.9 L231.2 18.8"/>
-    <path class="panel" d="M102 78 L114 38 H198 L186 78 Z"/>
-    <path class="pgrid" d="M130 78 L142 38 M158 78 L170 38 M108 58 H192"/>
-    <text x="96" y="54" class="lbl e" id="n-fotovoltaico">Fotovoltaico</text>
-    <text x="96" y="70" class="val e" id="t-fv">—</text>
+    <circle class="sunc" cx="70" cy="24" r="7"/>
+    <path class="rays" d="M70 11 V14 M70 34 V37 M57 24 H60 M80 24 H83 M60.8 14.8 L62.9 16.9 M77.1 31.1 L79.2 33.2 M60.8 33.2 L62.9 31.1 M77.1 16.9 L79.2 14.8"/>
+    <path class="panel" d="M-52 74 L-40 32 H52 L40 74 Z"/>
+    <path class="pgrid" d="M-21.3 74 L-9.3 32 M9.3 74 L21.3 32 M-46 53 H46"/>
+    <text x="0" y="58" class="val c halo" id="t-fv">—</text>
+    <text x="-60" y="58" class="lbl e" id="n-fotovoltaico">Fotovoltaico</text>
   </g>
 
-  <!-- Inverter sotto il pannello -->
+  <!-- Inverter: valore dentro -->
   <g id="g-inv1" class="clickable" data-key="inverter_1_potenza">
-    <rect class="box" x="100" y="96" width="44" height="36" rx="8"/>
-    <path class="isym" d="M104 129 L140 99"/>
-    <path class="isym" d="M106 104 H116 M106 108 H116"/>
-    <path class="isym wave" d="M125 124 q2.5 -4 5 0 t5 0"/>
-    <text x="94" y="110" class="lbl e" id="n-inverter_1">Inverter 1</text>
-    <text x="94" y="125" class="tv e" id="t-inv1">—</text>
+    <rect class="box" x="-26" y="88" width="52" height="34" rx="8"/>
+    <path class="isym" d="M-18 94 H-10 M-18 97.5 H-10 M-5 95.75 H4 M1 93.25 L4 95.75 L1 98.25 M9 96.5 q2 -3.5 4 0 t4 0"/>
+    <text x="0" y="116" class="tv c" id="t-inv1">—</text>
+    <text x="-32" y="109" class="lbl e" id="n-inverter_1">Inverter 1</text>
   </g>
   <g id="g-inv2" class="clickable" data-key="inverter_2_potenza">
-    <rect class="box" x="156" y="96" width="44" height="36" rx="8"/>
-    <path class="isym" d="M160 129 L196 99"/>
-    <path class="isym" d="M162 104 H172 M162 108 H172"/>
-    <path class="isym wave" d="M181 124 q2.5 -4 5 0 t5 0"/>
-    <text x="206" y="110" class="lbl" id="n-inverter_2">Inverter 2</text>
-    <text x="206" y="125" class="tv" id="t-inv2">—</text>
+    <rect class="box" x="-26" y="88" width="52" height="34" rx="8"/>
+    <path class="isym" d="M-18 94 H-10 M-18 97.5 H-10 M-5 95.75 H4 M1 93.25 L4 95.75 L1 98.25 M9 96.5 q2 -3.5 4 0 t4 0"/>
+    <text x="0" y="116" class="tv c" id="t-inv2">—</text>
+    <text x="32" y="109" class="lbl" id="n-inverter_2">Inverter 2</text>
   </g>
 
-  <!-- Rete elettrica: traliccio -->
+  <!-- Rete: traliccio senza riquadro; cavi e scintilla animati solo quando la casa preleva -->
   <g id="g-grid" class="clickable" data-key="rete_potenza|rete_stato">
-    <rect class="box" x="18" y="130" width="56" height="60" rx="12"/>
-    <path class="tower" d="M46 136 L36 184 M46 136 L56 184 M32 144 H60 M35 153 H57 M41 160 L53.5 172 M51 160 L38.5 172 M38.5 172 L56 184 M53.5 172 L36 184"/>
-    <path class="ins" d="M32 144 v3 M60 144 v3 M35 153 v3 M57 153 v3"/>
-    <text x="46" y="206" class="lbl c" id="n-rete_elettrica">Rete</text>
-    <text x="46" y="220" class="tv c" id="t-grid">—</text>
-    <text x="46" y="232" class="lbl c xs" id="t-grid-dir"></text>
+    <rect class="hit" x="-44" y="-36" width="70" height="70"/>
+    <path class="gwire" d="M-44 -12 Q-32 -6 -20 -18 M-44 -2 Q-30 3 -16 -8"/>
+    <path class="tower" d="M0 -30 L-18 30 M0 -30 L18 30 M-20 -22 H20 M-16 -12 H16 M-6 -10 L9.6 2 M6 -10 L-9.6 2 M-22 30 H22"/>
+    <path class="ins" d="M-20 -22 v4 M20 -22 v4 M-16 -12 v4 M16 -12 v4"/>
+    <path class="gspark" d="M27 -38 L22 -30 H26 L24 -23 L30 -32 H26 Z"/>
+    <text x="0" y="20" class="tv c halo" id="t-grid">—</text>
+    <text x="0" y="46" class="lbl c" id="n-rete_elettrica">Rete</text>
+    <text x="0" y="58" class="lbl c xs" id="t-grid-dir"></text>
   </g>
 
-  <!-- Batteria di accumulo (sotto) -->
-  <g id="g-batt" class="clickable" data-key="batteria_livello|batteria_potenza">
-    <rect class="bterm" x="142" y="186" width="16" height="4" rx="1.5"/>
-    <rect class="tank" x="128" y="190" width="44" height="62" rx="9"/>
-    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="128" y="252" width="44" height="0"/>
-    <rect class="tank-o" x="128" y="190" width="44" height="62" rx="9"/>
-    <path class="bbolt" id="b-bolt" d="M152 198 L145 209 H150 L148 218 L155 207 H150 Z"/>
-    <text x="150" y="240" class="mval c" id="t-soc"></text>
-    <text x="120" y="206" class="lbl e" id="n-batteria">Batteria</text>
-    <text x="120" y="220" class="tv e" id="t-batt">—</text>
-    <text x="120" y="232" class="lbl e xs" id="t-batt-dir"></text>
-  </g>
-
-  <!-- Casa: da qui escono le utenze -->
+  <!-- Casa: senza riquadro, valore dentro -->
   <g id="g-casa" class="clickable" data-key="casa_potenza">
-    <rect class="box" x="216" y="130" width="56" height="60" rx="12"/>
-    <path class="roof" d="M224 158 L244 140 L264 158 Z"/>
-    <path class="ico2" d="M256 150.8 V142 H260 V154.4 M228 158 V182 H260 V158 M240 182 V171 H248 V182"/>
-    <rect class="win" x="250" y="163" width="7" height="7" rx="1"/>
-    <text x="244" y="206" class="lbl c" id="n-casa">Casa</text>
-    <text x="244" y="220" class="tv c" id="t-casa">—</text>
+    <rect class="hit" x="-32" y="-34" width="64" height="64"/>
+    <path class="roof" d="M-30 -6 L0 -32 L30 -6 Z"/>
+    <path class="ico2" d="M17 -17.3 V-28 H22 V-12.9 M-24 -6 V28 H24 V-6"/>
+    <text x="0" y="17" class="val c" id="t-casa">—</text>
+    <text x="0" y="46" class="lbl c" id="n-casa">Casa</text>
+  </g>
+
+  <!-- Batteria (sotto): carica e potenza dentro -->
+  <g id="g-batt" class="clickable" data-key="batteria_livello|batteria_potenza">
+    <rect class="bterm" x="-9" y="214" width="18" height="4" rx="1.5"/>
+    <rect class="tank" x="-24" y="218" width="48" height="62" rx="10"/>
+    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="-24" y="280" width="48" height="0"/>
+    <rect class="tank-o" x="-24" y="218" width="48" height="62" rx="10"/>
+    <path class="bbolt" id="b-bolt" d="M2 222 L-4 231 H0 L-2 238 L4 229 H0 Z"/>
+    <text x="0" y="255" class="mval c halo" id="t-soc"></text>
+    <text x="0" y="270" class="tv c xs halo" id="t-batt">—</text>
+    <text x="-32" y="262" class="lbl e" id="n-batteria">Batteria</text>
+    <text x="-32" y="275" class="lbl e xs" id="t-batt-dir"></text>
   </g>
 
   <g id="g-utenze"></g>
@@ -619,7 +655,17 @@ const PDC_CSS = `
   .pgrid { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.2; opacity: .8; }
   .sunc  { fill: var(--c, var(--pdc-idle)); fill-opacity: .35; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; transition: fill-opacity .5s; }
   .rays  { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.8; stroke-linecap: round; opacity: .35;
-           transform-box: view-box; transform-origin: 222px 28px; transition: opacity .5s; }
+           transform-box: fill-box; transform-origin: center; transition: opacity .5s; }
+  .thin .pipe { stroke-width: 1.4; }
+  .thin .dots { stroke-width: 4.5; }
+  .halo { paint-order: stroke; stroke: var(--pdc-bg); stroke-width: 3px; stroke-linejoin: round; }
+  .hit  { fill: transparent; stroke: none; }
+  .gwire { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.3; stroke-linecap: round; stroke-dasharray: 3 4; opacity: .5; }
+  .run .gwire { opacity: 1; animation: pdc-wire .7s linear infinite; }
+  .gspark { fill: var(--c, var(--pdc-idle)); opacity: 0; }
+  .run .gspark { animation: pdc-blink 1.1s ease-in-out infinite; }
+  @keyframes pdc-wire  { to { stroke-dashoffset: -7; } }
+  @keyframes pdc-blink { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
   .run .rays { opacity: 1; animation: pdc-spin 14s linear infinite; }
   .run .sunc { fill-opacity: .8; }
   .isym  { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
@@ -643,7 +689,7 @@ const PDC_CSS = `
   @keyframes pdc-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 4; } }
 
   @media (prefers-reduced-motion: reduce) {
-    .flow.on .dots, .run .fan, .run .imp, .run .pring, .run .rays { animation: none; }
+    .flow.on .dots, .run .fan, .run .imp, .run .pring, .run .rays, .run .gwire, .run .gspark { animation: none; }
   }
 `;
 
@@ -721,15 +767,15 @@ class PdcFlowCard extends HTMLElement {
     };
     this._utenze.forEach((u, i) => {
       // linea dalla casa all'utenza: ognuna ha la sua, così ognuna ha la sua velocità
-      const f = mk('g', { id: `f-u${i}`, class: 'flow' }, flows);
+      const f = mk('g', { id: `f-u${i}`, class: 'flow thin' }, flows);
       mk('path', { class: 'pipe', d: '' }, f);
       mk('path', { class: 'dots', d: '' }, f);
       const g = mk('g', { id: `u${i}`, class: 'clickable', 'data-entity': u.entity }, rows);
       mk('circle', { class: 'ubox', cx: U.icon, cy: 0, r: U.r }, g);
-      const k = (U.r * 1.25) / 24;
-      const ico = mk('path', { id: `u${i}-ico`, class: 'uico', d: PDC_ICON_FALLBACK, transform: `translate(${U.icon - 12 * k} ${-12 * k}) scale(${k})` }, g);
-      const n = mk('text', { id: `u${i}-n`, class: 'lbl sm', x: U.text, y: -3 }, g);
-      mk('text', { id: `u${i}-v`, class: 'tv xs', x: U.text, y: 10 }, g);
+      const k = 0.6;
+      const ico = mk('path', { id: `u${i}-ico`, class: 'uico', d: PDC_ICON_FALLBACK, transform: `translate(${U.icon - 12 * k} ${-6 - 12 * k}) scale(${k})` }, g);
+      const n = mk('text', { id: `u${i}-n`, class: 'lbl sm', x: U.text, y: 4 }, g);
+      mk('text', { id: `u${i}-v`, class: 'tv xs c', x: U.icon, y: 13 }, g);
       const st = this._hass && this._hass.states[u.entity];
       let name = u.nome !== undefined && u.nome !== null ? String(u.nome) : (st && st.attributes.friendly_name) || u.entity;
       if (name.length > 15) name = name.slice(0, 14) + '…';
@@ -1109,7 +1155,6 @@ class PdcFlowCard extends HTMLElement {
     if (pBat !== null && c.batteria_inverti) pBat = -pBat;
     let pGrid = this._kw('rete_potenza');
     if (pGrid !== null && c.rete_inverti) pGrid = -pGrid;
-    const pHome = this._kw('casa_potenza');
     const soc = this._num('batteria_livello');
     const fmtP = (v) => (v === null ? '—' : Math.abs(v) < 1 ? f0(Math.abs(v) * 1000) + ' W' : f1(Math.abs(v)) + ' kW');
     // la soglia serve per rete e batteria, che oscillano; produzione e consumi si vedono da 10 W
@@ -1120,61 +1165,41 @@ class PdcFlowCard extends HTMLElement {
     const batChg = pBat !== null && pBat < -sE;
     const gridIn = pGrid !== null && pGrid > sE;
     const gridOut = pGrid !== null && pGrid < -sE;
-    const homeOn = pHome !== null ? pHome > 0.01 : fvOn || batDis || gridIn;
+    // Casa: dal sensore, oppure dal bilancio di fotovoltaico, batteria e rete
+    let pHome = this._kw('casa_potenza');
+    if (pHome === null && (pFv !== null || pBat !== null || pGrid !== null)) pHome = Math.max(0, (pFv || 0) + (pBat || 0) + (pGrid || 0));
+    const homeOn = pHome !== null && pHome > 0.01;
     const gridState = this._on('rete_stato'); // true = rete collegata
     const gridDown = gridState === false;
     const cFv = col('fotovoltaico', PDC_COL.solar);
     const cInv = col('inverter', cFv);
-    const cBat = col('batteria', PDC_COL.batt);
-    const cGrid = gridOut ? col('rete_elettrica', PDC_COL.gridOut) : col('rete_elettrica', PDC_COL.gridIn);
+    const num = (v, d) => (v !== undefined && v !== null && v !== '' && !isNaN(v) ? Number(v) : d);
+    const cSoc = c.batteria_colora ? pdcSocColor(soc, num(c.batteria_min, 0), num(c.batteria_max, 100)) : null;
+    const cBat = pdcCustomColor(colori.batteria) || cSoc || PDC_COL.batt;
+    const cBatTxt = cSoc || cBat;
+    const cGridIn = col('rete_elettrica', PDC_COL.gridIn);
+    const cGridOut = col('rete_elettrica', PDC_COL.gridOut);
     const cHome = col('casa', PDC_COL.home);
     const HOUSE = HOME || this._utenze.length > 0;
 
-    this._vis(['g-fv'], FV);
-    this._vis(['f-e_fv'], FV && !INV1 && !INV2);
-    this._vis(['g-inv1', 'f-e_inv1a', 'f-e_inv1b'], INV1);
-    this._vis(['g-inv2', 'f-e_inv2a', 'f-e_inv2b'], INV2);
-    this._vis(['g-batt', 'f-e_bat'], BATT);
-    this._vis(['g-grid', 'f-e_grid'], GRID || has('rete_stato'));
-    this._vis(['g-casa', 'f-e_casa'], HOUSE);
-    this._vis(['jn-e'], [FV, BATT, GRID, HOUSE].filter(Boolean).length >= 3);
+    // Chi manda energia a chi (ogni coppia ha la sua linea, senza passare da un centro comune)
+    const S = fvOn ? pFv : 0;
+    const Gi = gridIn ? pGrid : 0;
+    const Ge = gridOut ? -pGrid : 0;
+    const Bd = batDis ? pBat : 0;
+    const Bc = batChg ? -pBat : 0;
+    const fSG = Math.min(S, Ge);              // fotovoltaico → rete
+    const fBG = Math.max(0, Ge - fSG);        // batteria → rete
+    const fSB = Math.min(S - fSG, Bc);        // fotovoltaico → batteria
+    const fGB = Math.max(0, Bc - fSB);        // rete → batteria
+    const fSH = Math.max(0, S - fSG - fSB);   // fotovoltaico → casa
+    const fBH = Math.max(0, Bd - fBG);        // batteria → casa
+    const fGH = Math.max(0, Gi - fGB);        // rete → casa
 
-    this._color('g-fv', fixed('fotovoltaico') || (fvOn ? cFv : null));
-    this._els['g-fv'].classList.toggle('run', fvOn);
-    this._text('t-fv', fmtP(pFv), fvOn ? cFv : '');
-    this._flow('e_fv', fvOn, cFv, durE(pFv));
-    this._color('g-inv1', fixed('inverter') || (inv1On ? cInv : null));
-    this._text('t-inv1', fmtP(pInv1), inv1On ? cInv : '');
-    this._flow('e_inv1a', inv1On, cFv, durE(pInv1));
-    this._flow('e_inv1b', inv1On, cInv, durE(pInv1));
-    this._color('g-inv2', fixed('inverter') || (inv2On ? cInv : null));
-    this._text('t-inv2', fmtP(pInv2), inv2On ? cInv : '');
-    this._flow('e_inv2a', inv2On, cFv, durE(pInv2));
-    this._flow('e_inv2b', inv2On, cInv, durE(pInv2));
-
-    this._color('g-batt', cBat);
-    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 190, 62, cBat);
-    this._text('t-soc', soc === null ? '' : f0(soc) + '%');
-    this._els['b-bolt'].classList.toggle('on', batChg);
-    this._text('t-batt', pBat === null ? '—' : fmtP(pBat), batDis || batChg ? cBat : '');
-    this._text('t-batt-dir', batChg ? 'in carica' : batDis ? 'in scarica' : '');
-    this._flow('e_bat', batDis || batChg, cBat, durE(pBat), batChg);
-
-    this._color('g-grid', gridDown ? PDC_COL.island : fixed('rete_elettrica') || (gridIn || gridOut ? cGrid : null));
-    this._text('t-grid', fmtP(pGrid), gridIn || gridOut ? cGrid : '');
-    this._text('t-grid-dir', gridDown ? 'staccata' : gridIn ? 'prelievo' : gridOut ? 'immissione' : '', gridDown ? PDC_COL.island : '');
-    this._flow('e_grid', gridIn || gridOut, cGrid, durE(pGrid), gridOut);
-
-    this._color('g-casa', fixed('casa') || (homeOn ? cHome : null));
-    this._els['g-casa'].classList.toggle('run', homeOn);
-    this._text('t-casa', fmtP(pHome), homeOn ? cHome : '');
-    this._flow('e_casa', homeOn, cHome, durE(pHome));
-    this._color('jn-e', homeOn || fvOn || batDis || batChg || gridIn || gridOut ? 'var(--secondary-text-color)' : null);
-
-    // Utenze: una linea per utenza dalla casa; quelle "nascondi_a_zero" spente spariscono
+    // ---- Utenze (prima, perché decidono la disposizione) ----
     const U = PDC_U;
     const shown = [];
-    const state = [];
+    const ustate = [];
     this._utenze.forEach((u, i) => {
       const st = this._hass.states[u.entity];
       const unit = String(u.unita || (st && st.attributes.unit_of_measurement) || '');
@@ -1188,9 +1213,7 @@ class PdcFlowCard extends HTMLElement {
         txt = fmtP(kw);
         on = lim !== null ? raw > lim : kw > 0.01;
       } else if (st && !isNaN(raw)) {
-        txt = !u.unita && typeof this._hass.formatEntityState === 'function'
-          ? this._hass.formatEntityState(st)
-          : (Number.isInteger(raw) ? f0(raw) : f1(raw)) + (unit ? (unit === '°' ? '' : ' ') + unit : '');
+        txt = (Number.isInteger(raw) ? f0(raw) : f1(raw)) + (unit ? (['%', '°', '°C'].includes(unit) ? '' : ' ') + (unit === '°C' ? '°' : unit) : '');
         on = raw > (lim !== null ? lim : 0);
       } else if (st) {
         txt = typeof this._hass.formatEntityState === 'function' ? this._hass.formatEntityState(st) : String(st.state);
@@ -1202,35 +1225,115 @@ class PdcFlowCard extends HTMLElement {
       }
       // Stati tipo "Xxx.EnumType.PowerState.Off": resta solo l'ultima parte; testi lunghi accorciati
       if (/^[^\s]+\.[^\s]+$/.test(txt) && isNaN(parseFloat(txt))) txt = txt.split('.').pop();
-      if (txt.length > 16) txt = txt.slice(0, 15) + '…';
+      if (txt.length > 8) txt = txt.slice(0, 7) + '…';
       const cu = pdcCustomColor(u.colore) || PDC_U_COLORS[i % PDC_U_COLORS.length];
       const visible = !(u.nascondi && !on);
       this._show(`u${i}`, visible);
       this._show(`f-u${i}`, visible);
       this._color(`u${i}`, pdcCustomColor(u.colore) || (on ? cu : null));
       this._text(`u${i}-v`, txt, on ? cu : '');
-      state[i] = { on, cu, kw };
+      ustate[i] = { on, cu, kw };
       if (visible) shown.push(i);
     });
     const n = shown.length;
-    const y0 = Math.max(40, U.bus - ((n - 1) * U.row) / 2);
+
+    // ---- Disposizione: con utenze a destra, oppure su tutta la larghezza ----
+    const lay = n ? PDC_E_LAYOUT.utenze : PDC_E_LAYOUT.pieno;
+    const layKey = n ? 'u' : 'p';
+    if (this._layKey !== layKey) {
+      const P = pdcEnergyPaths(lay);
+      for (const id of PDC_E_FLOWS) this._els['f-' + id].querySelectorAll('path').forEach((pth) => pth.setAttribute('d', P[id]));
+      const tr = (id, x, y) => this._els[id].setAttribute('transform', `translate(${x} ${y})`);
+      tr('g-fv', lay.sx, 0);
+      tr('g-inv1', lay.sx - 30, 0);
+      tr('g-inv2', lay.sx + 30, 0);
+      tr('g-batt', lay.sx, 0);
+      tr('g-grid', lay.gx, 180);
+      tr('g-casa', lay.hx, 180);
+      this._els['jn-s'].setAttribute('cx', lay.sx);
+      this._layKey = layKey;
+    }
+
+    this._vis(['g-fv'], FV);
+    this._vis(['f-e_fv'], FV && !INV1 && !INV2);
+    this._vis(['g-inv1', 'f-e_inv1a', 'f-e_inv1b'], INV1);
+    this._vis(['g-inv2', 'f-e_inv2a', 'f-e_inv2b'], INV2);
+    this._vis(['jn-s'], FV && (INV1 || INV2));
+    this._vis(['g-batt'], BATT);
+    this._vis(['g-grid'], GRID || has('rete_stato'));
+    this._vis(['g-casa'], HOUSE);
+    this._vis(['f-e_sg'], FV && GRID);
+    this._vis(['f-e_sh'], FV && HOUSE);
+    this._vis(['f-e_sb'], FV && BATT);
+    this._vis(['f-e_gh'], GRID && HOUSE);
+    this._vis(['f-e_gb'], GRID && BATT);
+    this._vis(['f-e_bh'], BATT && HOUSE);
+
+    // Fotovoltaico e inverter
+    this._color('g-fv', fixed('fotovoltaico') || (fvOn ? cFv : null));
+    this._els['g-fv'].classList.toggle('run', fvOn);
+    this._text('t-fv', fmtP(pFv), fvOn ? cFv : '');
+    this._flow('e_fv', fvOn, fvOn ? cFv : null, durE(pFv));
+    this._color('g-inv1', fixed('inverter') || (inv1On ? cInv : null));
+    this._text('t-inv1', fmtP(pInv1), inv1On ? cInv : '');
+    this._flow('e_inv1a', inv1On, inv1On ? cFv : null, durE(pInv1));
+    this._flow('e_inv1b', inv1On, inv1On ? cInv : null, durE(pInv1));
+    this._color('g-inv2', fixed('inverter') || (inv2On ? cInv : null));
+    this._text('t-inv2', fmtP(pInv2), inv2On ? cInv : '');
+    this._flow('e_inv2a', inv2On, inv2On ? cFv : null, durE(pInv2));
+    this._flow('e_inv2b', inv2On, inv2On ? cInv : null, durE(pInv2));
+    this._color('jn-s', fvOn ? cFv : null);
+
+    // Linee dirette tra i punti: colorate e animate solo quando ci passa energia, grigie da ferme
+    const link = (id, kw, color, rev = false) => this._flow(id, kw > 0.01, kw > 0.01 ? color : null, durE(kw), rev);
+    link('e_sg', fSG, cGridOut);
+    link('e_sh', fSH, cFv);
+    link('e_sb', fSB, cFv);
+    link('e_gh', fGH, cGridIn);
+    if (fBG > 0.01) link('e_gb', fBG, cGridOut, true);
+    else link('e_gb', fGB, cGridIn);
+    link('e_bh', fBH, cBat);
+
+    // Batteria
+    this._color('g-batt', cBat);
+    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 218, 62, cBat);
+    this._text('t-soc', soc === null ? '' : f0(soc) + '%');
+    paint('n-batteria', cSoc);
+    this._els['b-bolt'].classList.toggle('on', batChg);
+    this._text('t-batt', pBat === null ? '' : fmtP(pBat), batDis || batChg || cSoc ? cBatTxt : '');
+    this._text('t-batt-dir', batChg ? 'in carica' : batDis ? 'in scarica' : '');
+
+    // Rete: animata solo quando la casa preleva
+    const cGrid = gridDown ? PDC_COL.island : gridOut ? cGridOut : cGridIn;
+    this._color('g-grid', gridDown ? PDC_COL.island : fixed('rete_elettrica') || (gridIn || gridOut ? cGrid : null));
+    this._els['g-grid'].classList.toggle('run', gridIn && !gridDown);
+    this._text('t-grid', fmtP(pGrid), gridIn || gridOut ? cGrid : '');
+    this._text('t-grid-dir', gridDown ? 'staccata' : gridIn ? 'prelievo' : gridOut ? 'immissione' : '', gridDown ? PDC_COL.island : '');
+
+    // Casa
+    this._color('g-casa', fixed('casa') || (homeOn ? cHome : null));
+    this._text('t-casa', fmtP(pHome), homeOn ? cHome : '');
+
+    // Utenze: una linea per utenza dalla casa
+    const y0 = Math.max(44, U.bus - ((n - 1) * U.row) / 2);
     const ys = shown.map((_, k) => Math.round(y0 + k * U.row));
+    const from = lay.hx + 26;
     shown.forEach((i, k) => {
       const y = ys[k];
       const x1 = U.icon - U.r;
       this._els[`u${i}`].setAttribute('transform', `translate(0 ${y})`);
-      const d = `M${U.from} ${U.bus} C${U.from + 20} ${U.bus} ${x1 - 20} ${y} ${x1} ${y}`;
+      const d = `M${from} ${U.bus} C${from + 14} ${U.bus} ${x1 - 14} ${y} ${x1} ${y}`;
       const g = this._els[`f-u${i}`];
       if (g._d !== d) {
         g.querySelectorAll('path').forEach((pth) => pth.setAttribute('d', d));
         g._d = d;
       }
-      const s = state[i];
+      const s = ustate[i];
       this._flow(`u${i}`, s.on, s.on ? s.cu : null, s.kw !== null ? durE(s.kw) : 1.6);
     });
 
     // Altezze: energia (cresce con le utenze) + impianto/acqua
-    const eh = n ? Math.max(PDC_EH, ys[n - 1] + 26) : PDC_EH;
+    const eh = n ? Math.max(PDC_EH, ys[n - 1] + 30) : PDC_EH;
     if (this._eH !== eh) {
       const sv = this._els['sv-e'];
       sv.setAttribute('height', eh);
@@ -1438,6 +1541,9 @@ const PDC_FIELD_SELECTORS = {
   batteria_livello: PDC_SENSOR,
   batteria_potenza: PDC_SENSOR,
   batteria_inverti: { boolean: {} },
+  batteria_colora: { boolean: {} },
+  batteria_min: { number: { min: 0, max: 100, step: 1, mode: 'box', unit_of_measurement: '%' } },
+  batteria_max: { number: { min: 0, max: 100, step: 1, mode: 'box', unit_of_measurement: '%' } },
   rete_potenza: PDC_SENSOR,
   rete_inverti: { boolean: {} },
   casa_potenza: PDC_SENSOR,
@@ -1488,9 +1594,8 @@ const PDC_FIELD_SELECTORS = {
 
 // [chiave, titolo, icona, campi]; "nome_x" e "colore_x" si riferiscono alle sezioni nomi/colori
 const PDC_GROUPS = [
-  ['generale', 'Generale', 'mdi:card-text-outline', ['title', 'nome_sezione_energia', 'nome_sezione_impianto', 'nome_sezione_acqua', 'nome_setpoint', 'soglia_energia']],
   ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'nome_fotovoltaico', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter']],
-  ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'nome_batteria', 'colore_batteria']],
+  ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'nome_batteria', 'colore_batteria']],
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
   ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'nome_casa', 'colore_casa']],
   ['esterno', 'Temperatura esterna', 'mdi:thermometer', ['temperatura_esterna', 'nome_esterno', 'colore_esterno', 'tcolora_esterno', 'tmin_esterno', 'tmax_esterno']],
@@ -1512,7 +1617,7 @@ const PDC_GROUPS = [
   ['rubinetto', 'Rubinetto', 'mdi:faucet', ['nome_rubinetto', 'colore_rubinetto']],
 ];
 
-const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti'];
+const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max'];
 
 const PDC_TNUM = { number: { min: -30, max: 100, step: 1, mode: 'box', unit_of_measurement: '°C' } };
 
@@ -1544,23 +1649,38 @@ const PDC_U_SELECTORS = {
   soglia: { number: { mode: 'box', step: 'any' } },
 };
 
+// Le tre parti della card, nello stesso ordine del disegno: [chiave, titolo, icona, campi della sezione, gruppi]
+const PDC_SECTIONS = [
+  ['energia', 'Energia', 'mdi:lightning-bolt', ['nome_sezione_energia', 'soglia_energia'],
+    ['fotovoltaico', 'batteria', 'rete_elettrica', 'casa']],
+  ['impianto', 'Pompa di calore e impianto', 'mdi:heat-pump', ['nome_sezione_impianto', 'nome_setpoint'],
+    ['esterno', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo', 'ingresso_accumulo', 'circolatore', 'pavimento']],
+  ['acqua', 'Acqua sanitaria', 'mdi:water', ['nome_sezione_acqua'],
+    ['rete', 'stop', 'contatore', 'puffer', 'autoclave', 'ricircolo', 'rubinetto']],
+];
+
 function pdcEditorSchema(config) {
   const n = Array.isArray(config.utenze) ? config.utenze.length : 0;
-  const out = [];
-  for (const g of PDC_GROUPS) {
-    out.push(pdcGroup(g));
-    if (g[0] !== 'casa') continue;
-    for (let i = 0; i <= n; i++) {
-      const add = i === n;
-      out.push({
-        type: 'expandable',
-        name: 'g_u' + i,
-        flatten: true,
-        title: add ? 'Aggiungi utenza elettrica' : 'Utenza ' + (i + 1),
-        icon: add ? 'mdi:plus' : 'mdi:power-plug-outline',
-        schema: (add ? ['entity'] : PDC_U_FIELDS).map((f) => ({ name: `u${i}_${f}`, selector: PDC_U_SELECTORS[f] })),
-      });
+  const byKey = Object.fromEntries(PDC_GROUPS.map((g) => [g[0], g]));
+  const out = [{ name: 'title', selector: pdcSelectorFor('title') }];
+  for (const [key, title, icon, fields, groups] of PDC_SECTIONS) {
+    const schema = fields.map((f) => ({ name: f, selector: pdcSelectorFor(f) }));
+    for (const gk of groups) schema.push(pdcGroup(byKey[gk]));
+    if (key === 'energia') {
+      // utenze elettriche: escono dalla casa
+      for (let i = 0; i <= n; i++) {
+        const add = i === n;
+        schema.push({
+          type: 'expandable',
+          name: 'g_u' + i,
+          flatten: true,
+          title: add ? 'Aggiungi utenza elettrica' : 'Utenza ' + (i + 1),
+          icon: add ? 'mdi:plus' : 'mdi:power-plug-outline',
+          schema: (add ? ['entity'] : PDC_U_FIELDS).map((f) => ({ name: `u${i}_${f}`, selector: PDC_U_SELECTORS[f] })),
+        });
+      }
     }
+    out.push({ type: 'expandable', name: 's_' + key, flatten: true, title, icon, schema });
   }
   return out;
 }
@@ -1577,12 +1697,15 @@ const PDC_LABELS = {
   batteria_livello: 'Livello di carica (%)',
   batteria_potenza: 'Potenza (positiva = in scarica)',
   batteria_inverti: 'Segno invertito (positiva = in carica)',
+  batteria_colora: 'Colore secondo la carica (rosso scarica → verde carica)',
+  batteria_min: 'Rosso fino a',
+  batteria_max: 'Verde da',
   rete_potenza: 'Potenza (positiva = prelievo dalla rete)',
   rete_inverti: 'Segno invertito (positiva = immissione)',
   rete_stato: 'Stato della rete (on = collegata)',
   soglia_energia: 'Rete e batteria animate sopra',
   casa_potenza: 'Consumo della casa',
-  nome_sezione_energia: 'Nome sezione energia',
+  nome_sezione_energia: 'Nome della sezione',
   colore_rete_elettrica: 'Colore icona e linea',
   colore_fotovoltaico: 'Colore icona e linea',
   colore_batteria: 'Colore batteria e linea',
@@ -1615,8 +1738,8 @@ const PDC_LABELS = {
   autoclave_stato: 'Stato',
   autoclave_comando: "Blocco autoclave (si apre toccando l'autoclave)",
   ricircolo: 'Pompa ricircolo',
-  nome_sezione_impianto: 'Nome sezione impianto',
-  nome_sezione_acqua: 'Nome sezione acqua',
+  nome_sezione_impianto: 'Nome della sezione',
+  nome_sezione_acqua: 'Nome della sezione',
   nome_setpoint: 'Scritta prima del setpoint',
   acs_setpoint: 'Setpoint (numero piccolo nel serbatoio)',
   accumulo_setpoint: 'Setpoint (numero piccolo nel serbatoio)',
@@ -1684,6 +1807,9 @@ class PdcFlowCardEditor extends HTMLElement {
           return 'Predefinito: ' + (sch.name.startsWith('tmin_') ? d[0] : d[1]) + ' °C';
         }
         if (sch.name === 'colore_rete_elettrica') return 'Nessuno = blu in prelievo, viola in immissione';
+        if (sch.name === 'batteria_min') return 'Predefinito: 0 %';
+        if (sch.name === 'batteria_max') return 'Predefinito: 100 %';
+        if (sch.name === 'batteria_colora') return 'Colora batteria, linea, percentuale e nome. Un colore fisso, se scelto, vale per il disegno';
         if (sch.name === 'rete_stato') return 'Se la rete si stacca, sotto la rete compare "staccata"';
         if (/^u\d+_soglia$/.test(sch.name)) return "Nell'unità del sensore. Vuoto = potenze sopra 10 W, altri valori sopra 0";
         if (/^u\d+_entity$/.test(sch.name)) return 'Potenza (W o kW) oppure un altro sensore: stato, percentuale…';
@@ -1748,7 +1874,11 @@ class PdcFlowCardEditor extends HTMLElement {
       if (empty(value[k])) delete ent[k];
       else ent[k] = value[k];
     }
-    cfg.entities = ent;
+    // Ordine nello YAML: energia, pompa di calore e impianto, acqua sanitaria (poi eventuali altre chiavi)
+    const ordered = {};
+    for (const k of PDC_ENTITY_ORDER) if (ent[k] !== undefined) ordered[k] = ent[k];
+    for (const k of Object.keys(ent)) if (!(k in ordered)) ordered[k] = ent[k];
+    cfg.entities = ordered;
     if (Object.keys(ent).length) delete cfg.demo;
 
     const nomi = {};
@@ -1786,6 +1916,7 @@ class PdcFlowCardEditor extends HTMLElement {
     if (cfg.acqua_portata_unita === 'auto') delete cfg.acqua_portata_unita;
     if (!cfg.puffer) delete cfg.puffer;
     if (!cfg.batteria_inverti) delete cfg.batteria_inverti;
+    if (!cfg.batteria_colora) delete cfg.batteria_colora;
     if (!cfg.rete_inverti) delete cfg.rete_inverti;
     delete cfg.pulsanti;
     delete cfg.entities.gateway_stato_rete;
@@ -1812,7 +1943,7 @@ class PdcFlowCardEditor extends HTMLElement {
       cfg.utenze = utenze;
       delete cfg.demo;
     } else delete cfg.utenze;
-    return cfg;
+    return pdcOrderConfig(cfg);
   }
 }
 

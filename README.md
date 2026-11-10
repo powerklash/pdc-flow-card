@@ -2,7 +2,7 @@
 
 Card per la dashboard di Home Assistant che disegna in modo animato l'energia, una pompa di calore e l'acqua sanitaria di casa:
 
-- **Energia:** pannelli fotovoltaici con uno o due inverter, batteria di accumulo, rete elettrica e casa, con la direzione dei flussi (più potenza, pallini più veloci); dalla casa escono le utenze elettriche che scegli tu.
+- **Energia:** pannelli fotovoltaici con uno o due inverter, batteria di accumulo, rete elettrica e casa. Ogni punto è collegato direttamente agli altri (per esempio batteria → casa) e i valori sono dentro le icone; più potenza passa, più i pallini corrono. Il traliccio si anima quando la casa preleva dalla rete. Dalla casa escono le utenze elettriche che scegli tu; se nessuna è accesa il disegno usa tutta la larghezza.
 - **Impianto:** temperatura esterna, pompa di calore, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
 - **Acqua sanitaria:** rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto.
 
@@ -27,7 +27,7 @@ HACS aggiunge da solo la risorsa della dashboard.
 
 ## Configurazione
 
-Aggiungi la card **PdC Flow Card** dall'editor visuale: c'è un gruppo per ogni componente, con le sue entità, il nome e il colore.
+Aggiungi la card **PdC Flow Card** dall'editor visuale. L'editor è diviso in tre parti, come la card: **Energia**, **Pompa di calore e impianto** e **Acqua sanitaria**. Dentro ogni parte c'è un gruppo per componente, con le sue entità, il nome e il colore; lo YAML viene scritto nello stesso ordine.
 
 Esempio in YAML:
 
@@ -126,6 +126,8 @@ utenze:
 | `soglia_pdc`, `soglia_acs` | potenza in kW sopra cui la pompa o il ciclo acqua calda sono considerati accesi (predefinito 0,1) |
 | `puffer` | `true` mostra il puffer anche senza autoclave |
 | `batteria_inverti`, `rete_inverti` | `true` se il sensore usa il segno opposto |
+| `batteria_colora` | `true` colora la batteria secondo la carica: rosso quando è scarica, verde brillante quando è carica |
+| `batteria_min`, `batteria_max` | percentuale a cui la batteria è rossa e a cui è verde (predefinito 0 e 100) |
 | `soglia_energia` | potenza in kW sopra cui i flussi elettrici si animano (predefinito 0,1) |
 | `demo` | `true` mostra dati di esempio finché non è impostata nessuna entità; è l'anteprima che compare nella scelta delle card |
 
