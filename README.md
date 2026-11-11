@@ -2,7 +2,7 @@
 
 [🇮🇹 Italiano](#italiano) · [🇬🇧 English](#english)
 
-[![Esempio della card / Card example](images/esempio.png)](https://github.com/powerklash/pdc-flow-card/blob/main/esempio.png)
+![Esempio della card / Card example](images/esempio.png)
 
 ---
 
