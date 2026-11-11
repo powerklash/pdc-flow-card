@@ -1,47 +1,69 @@
 # PdC Flow Card
 
-Card per la dashboard di Home Assistant che disegna in modo animato l'energia, una pompa di calore e l'acqua sanitaria di casa:
+[🇮🇹 Italiano](#italiano) · [🇬🇧 English](#english)
 
-- **Energia:** pannelli fotovoltaici con uno o due inverter, batteria di accumulo, rete elettrica e casa. Ogni punto è collegato direttamente agli altri (per esempio batteria → casa) e i valori sono dentro le icone; più potenza passa, più i pallini corrono. Il traliccio si anima quando la casa preleva dalla rete. Dalla casa escono le utenze elettriche che scegli tu; se nessuna è accesa il disegno usa tutta la larghezza.
-- **Impianto:** temperatura esterna, pompa di calore, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
-- **Acqua sanitaria:** rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto. Il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione.
+![Esempio della card / Card example](images/esempio.png)
 
-![Esempio della card](images/esempio.png)
+---
 
-Ogni componente compare solo se la sua entità è impostata; una sezione senza entità sparisce. Toccando un componente si apre la finestra di Home Assistant della sua entità: da lì si chiude lo stop, si accende il ricircolo o si blocca l'autoclave.
+## Italiano
 
-## Installazione con HACS
+Card per la dashboard di Home Assistant che disegna in modo animato l'energia di casa, una pompa di calore (PdC) e l'acqua sanitaria.
+
+- **Energia:** pannelli fotovoltaici con uno o due inverter, batteria di accumulo, rete elettrica e casa.
+  - Ogni punto è collegato direttamente agli altri, per esempio batteria → casa.
+  - Le linee compaiono solo quando ci passa energia. Più potenza passa, più i pallini corrono: pochi watt sono lentissimi.
+  - Nomi e valori sono dentro le icone.
+  - Il traliccio si anima quando la casa preleva dalla rete.
+  - Dalla casa escono le utenze elettriche che scegli tu. Se nessuna è accesa, il disegno usa tutta la larghezza.
+- **Impianto:**
+  - pompa di calore con potenza, modalità e un'icona della funzione attiva (riscaldamento, raffrescamento, acqua sanitaria);
+  - temperatura esterna, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
+- **Acqua sanitaria:**
+  - rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto;
+  - il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione.
+
+Ogni componente compare solo se la sua entità è impostata; una sezione senza entità sparisce.
+
+Toccando un componente si apre la finestra di Home Assistant della sua entità: da lì si chiude lo stop, si accende il ricircolo o si blocca l'autoclave.
+
+### Installazione con HACS
 
 1. In HACS apri il menu **⋮** in alto a destra e scegli **Repository personalizzati**.
 2. Incolla l'indirizzo di questo repository, scegli il tipo **Dashboard** e premi **Aggiungi**.
-3. Cerca **PdC Flow Card** in HACS e premi **Scarica**.
+3. Cerca **PdC Flow Card** e premi **Scarica**.
 4. Ricarica la pagina del browser (Ctrl+F5).
 
 HACS aggiunge da solo la risorsa della dashboard.
 
-## Installazione manuale
+### Installazione manuale
 
 1. Copia `pdc-flow-card.js` in `/config/www/`.
 2. In **Impostazioni → Plance → ⋮ → Risorse** aggiungi `/local/pdc-flow-card.js?v=1`, tipo **Modulo JavaScript**.
 3. A ogni aggiornamento del file aumenta il numero dopo `?v=`.
 
-## Configurazione
+### Configurazione
 
-Aggiungi la card **PdC Flow Card** dall'editor visuale. L'editor è diviso in tre parti, come la card: **Energia**, **Pompa di calore e impianto** e **Acqua sanitaria**. Dentro ogni parte c'è un gruppo per componente, con le sue entità, il nome e il colore; lo YAML viene scritto nello stesso ordine.
+Aggiungi la card **PdC Flow Card** dall'editor visuale.
+- L'editor è diviso in tre parti, come la card: **Energia**, **Pompa di calore e impianto** e **Acqua sanitaria**.
+- In ogni parte c'è un gruppo per componente, con le sue entità, il nome e il colore.
+- Lo YAML viene scritto nello stesso ordine.
 
 Esempio in YAML:
 
 ```yaml
 type: custom:pdc-flow-card
 entities:
+  # Energia
   fv_potenza: sensor.fotovoltaico_potenza
   inverter_1_potenza: sensor.inverter_1_potenza
   inverter_2_potenza: sensor.inverter_2_potenza
   batteria_livello: sensor.batteria_livello
   batteria_potenza: sensor.batteria_potenza
   rete_potenza: sensor.rete_potenza
-  casa_potenza: sensor.casa_consumo
   rete_stato: binary_sensor.rete_collegata
+  casa_potenza: sensor.casa_consumo
+  # Pompa di calore e impianto
   temperatura_esterna: sensor.temperatura_esterna
   pdc_potenza: sensor.pdc_potenza
   riscaldamento: binary_sensor.pdc_riscaldamento
@@ -53,25 +75,26 @@ entities:
   acs_setpoint: climate.bollitore_setpoint
   accumulo_temperatura: sensor.accumulo_temperatura
   circolatore: binary_sensor.circolatore_pavimento
+  # Acqua sanitaria
   acqua_valvola: switch.valvola_acqua
   acqua_portata: sensor.portata_acqua
   acqua_totale: sensor.contatore_acqua
-  ricircolo: switch.ricircolo
   autoclave_velocita: sensor.autoclave_giri
   autoclave_pressione: sensor.autoclave_pressione
   autoclave_comando: select.autoclave_blocco
+  ricircolo: switch.ricircolo
 ```
 
-### Entità
+#### Entità
 
 | Chiave | Cosa serve |
 |---|---|
-| `fv_potenza` | potenza prodotta dal fotovoltaico (se manca, è la somma degli inverter) |
+| `fv_potenza` | potenza prodotta dal fotovoltaico (se manca, è la somma degli inverter; i valori negativi contano come 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | potenza dei due inverter, disegnati sotto i pannelli |
 | `batteria_livello`, `batteria_potenza` | carica della batteria (%) e potenza (positiva = in scarica) |
 | `rete_potenza` | potenza della rete (positiva = prelievo, negativa = immissione) |
-| `casa_potenza` | consumo della casa |
-| `rete_stato` | stato della rete (on = collegata): se la rete si stacca, sotto la rete compare "staccata" |
+| `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
+| `casa_potenza` | consumo della casa (se manca, viene calcolato) |
 | `temperatura_esterna` | temperatura esterna |
 | `pdc_potenza` | potenza della pompa di calore (anche una lista di sensori, che vengono sommati) |
 | `riscaldamento`, `raffrescamento` | modalità attiva della pompa di calore |
@@ -84,15 +107,17 @@ entities:
 | `acqua_valvola` | valvola dell'acqua (on = aperta) |
 | `acqua_portata` | portata istantanea |
 | `acqua_totale` oppure `acqua_oggi` | contatore totale (i litri di oggi vengono calcolati dalle statistiche) oppure litri del giorno |
-| `ricircolo` | pompa di ricircolo |
 | `autoclave_velocita`, `autoclave_pressione`, `autoclave_portata`, `autoclave_stato` | dati dell'autoclave |
 | `autoclave_comando` | select (Abilita/Disabilita) o switch per bloccare l'autoclave |
+| `ricircolo` | pompa di ricircolo |
 
 I setpoint accettano un climate o un water_heater (attributo `temperature`) oppure un sensore.
 
-### Utenze elettriche
+#### Utenze elettriche
 
-Dalla casa escono, in colonna, le utenze che aggiungi. Nell'editor visuale c'è il gruppo **Aggiungi utenza elettrica**; in YAML:
+Dalla casa escono, in colonna, le utenze che aggiungi. Ogni utenza è una "pillola" con icona, nome e valore.
+
+Nell'editor visuale c'è il gruppo **Aggiungi utenza elettrica**. In YAML:
 
 ```yaml
 utenze:
@@ -103,18 +128,22 @@ utenze:
     nome: Lavatrice
     icona: mdi:washing-machine
     colore: teal
-    nascondi_a_zero: true   # la riga sparisce quando è spenta
+    nascondi_a_zero: true   # sparisce quando è spenta
   - entity: sensor.forno_temperatura
     nome: Forno
     icona: mdi:stove
     soglia: 65              # accesa sopra 65 (unità del sensore)
 ```
 
-- Una potenza (W o kW) è accesa sopra 10 W; un altro numero sopra 0; uno stato quando non è "off" o "standby". `soglia` cambia il limite.
-- Senza `nome` si usa il nome dell'entità; senza `icona` quella dell'entità.
-- Si possono incollare anche le voci `individual` di power-flow-card-plus: `name`, `icon`, `color`, `display_zero: false` e `display_zero_tolerance` vengono riconosciute.
+- Quando un'utenza è accesa:
+  - una potenza (W o kW): appena è sopra 0;
+  - un altro numero: sopra 0;
+  - uno stato: quando non è "off" o "standby".
+  - `soglia` cambia il limite.
+- Senza `nome` si usa il nome dell'entità; senza `icona` si usa quella dell'entità.
+- Si possono incollare anche le voci `individual` di power-flow-card-plus. Vengono riconosciute `name`, `icon`, `color`, `display_zero: false` e `display_zero_tolerance`.
 
-### Opzioni
+#### Opzioni
 
 | Opzione | Effetto |
 |---|---|
@@ -122,13 +151,13 @@ utenze:
 | `nomi` | nomi dei componenti; `''` toglie la scritta |
 | `colori` | colore di icone e disegni: nome del tema (`red`, `blue`…), `#hex` o `[r, g, b]` |
 | `temperature` | per ogni temperatura `colora: true` e `min` / `max`: scala da celeste a rosso |
-| `acqua_portata_unita` | unità della portata se il sensore la dichiara male (`L/h`, `L/min`, `m³/h`…) |
-| `soglia_pdc`, `soglia_acs` | potenza in kW sopra cui la pompa o il ciclo acqua calda sono considerati accesi (predefinito 0,1) |
-| `puffer` | `true` mostra il puffer anche senza autoclave |
+| `soglia_energia` | potenza in kW sopra cui rete e batteria si animano (predefinito 0: qualsiasi valore) |
 | `batteria_inverti`, `rete_inverti` | `true` se il sensore usa il segno opposto |
-| `batteria_colora` | `true` colora la batteria secondo la carica: rosso quando è scarica, verde brillante quando è carica |
+| `batteria_colora` | `true` colora la batteria secondo la carica: rossa quando è scarica, verde brillante quando è carica |
 | `batteria_min`, `batteria_max` | percentuale a cui la batteria è rossa e a cui è verde (predefinito 0 e 100) |
-| `soglia_energia` | potenza in kW sopra cui rete e batteria si animano (predefinito 0: qualsiasi valore; pochi watt = pallini lentissimi) |
+| `soglia_pdc`, `soglia_acs` | potenza in kW sopra cui la pompa o il ciclo acqua calda sono considerati accesi (predefinito 0,1) |
+| `acqua_portata_unita` | unità della portata se il sensore la dichiara male (`L/h`, `L/min`, `m³/h`…) |
+| `puffer` | `true` mostra il puffer anche senza autoclave |
 | `demo` | `true` mostra dati di esempio finché non è impostata nessuna entità; è l'anteprima che compare nella scelta delle card |
 
 Esempio:
@@ -141,9 +170,129 @@ colori:
   bollitore: red
 temperature:
   bollitore: { colora: true, min: 35, max: 60 }
+batteria_colora: true
 acqua_portata_unita: L/h
 ```
 
-## Verifica della versione
+#### Verifica della versione
 
 Nella console del browser (F12) compare `PDC-FLOW-CARD v<versione>`.
+
+---
+
+## English
+
+A Home Assistant dashboard card that draws an animated view of the home's energy, a heat pump (PdC, *pompa di calore*) and the domestic water system.
+
+> The configuration keys are in Italian (for example `batteria_potenza` = battery power). The tables below translate them.
+
+- **Energy:** solar panels with one or two inverters, home battery, grid and house.
+  - Every point is linked directly to the others, for example battery → house.
+  - Lines appear only while energy flows through them. The more power flows, the faster the dots move: a few watts are very slow.
+  - Names and values are inside the icons.
+  - The pylon is animated while the house draws power from the grid.
+  - Electrical loads you choose branch out of the house. When none is on, the drawing uses the full width.
+- **Heating system:**
+  - heat pump with power, mode and an icon of the active function (heating, cooling, hot water);
+  - outdoor temperature, 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints.
+- **Domestic water:**
+  - mains, shut-off valve, water meter (L/min and today's litres), break tank, booster pump, hot-water recirculation and tap;
+  - the meter fills the break tank; water flows from the tank to the tap only while the booster pump is running.
+
+Each component is shown only when its entity is set; a section with no entities disappears.
+
+Tapping a component opens Home Assistant's dialog for its entity: from there you can close the valve, start the recirculation pump or lock the booster pump.
+
+### Install with HACS
+
+1. In HACS open the **⋮** menu (top right) and choose **Custom repositories**.
+2. Paste this repository's URL, choose the **Dashboard** type and press **Add**.
+3. Search for **PdC Flow Card** and press **Download**.
+4. Reload the browser page (Ctrl+F5).
+
+HACS adds the dashboard resource for you.
+
+### Manual install
+
+1. Copy `pdc-flow-card.js` to `/config/www/`.
+2. In **Settings → Dashboards → ⋮ → Resources** add `/local/pdc-flow-card.js?v=1` as a **JavaScript module**.
+3. Each time you replace the file, increase the number after `?v=`.
+
+### Configuration
+
+Add the **PdC Flow Card** from the visual editor.
+- The editor is split into three parts, like the card: **Energia** (energy), **Pompa di calore e impianto** (heat pump and heating system) and **Acqua sanitaria** (domestic water).
+- Each part has one group per component, with its entities, name and colour.
+- The YAML is written in the same order.
+
+See the YAML example in the Italian section above: the keys are the same.
+
+#### Entities
+
+| Key | Meaning |
+|---|---|
+| `fv_potenza` | solar power (if missing, the sum of the inverters; negative values count as 0) |
+| `inverter_1_potenza`, `inverter_2_potenza` | power of the two inverters, drawn below the panels |
+| `batteria_livello`, `batteria_potenza` | battery charge (%) and power (positive = discharging) |
+| `rete_potenza` | grid power (positive = import, negative = export) |
+| `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
+| `casa_potenza` | house consumption (calculated if missing) |
+| `temperatura_esterna` | outdoor temperature |
+| `pdc_potenza` | heat pump power (also a list of sensors, which are added up) |
+| `riscaldamento`, `raffrescamento` | heating / cooling mode active |
+| `acs_potenza` or `acs_attiva` | hot-water cycle power, or an on/off entity |
+| `pdc_mandata`, `pdc_ritorno` | flow and return temperatures |
+| `acs_temperatura`, `acs_setpoint` | hot water tank temperature and setpoint |
+| `accumulo_temperatura`, `accumulo_ingresso`, `accumulo_setpoint` | buffer tank temperature, inlet and setpoint |
+| `circolatore` | underfloor circulator |
+| `pavimento_mandata`, `pavimento_ritorno` | underfloor flow and return temperatures |
+| `acqua_valvola` | water valve (on = open) |
+| `acqua_portata` | instant water flow |
+| `acqua_totale` or `acqua_oggi` | total meter (today's litres come from statistics) or litres of the day |
+| `autoclave_velocita`, `autoclave_pressione`, `autoclave_portata`, `autoclave_stato` | booster pump speed, pressure, flow and status |
+| `autoclave_comando` | select (Abilita/Disabilita = enable/disable) or switch to lock the booster pump |
+| `ricircolo` | recirculation pump |
+
+Setpoints accept a climate or water_heater entity (`temperature` attribute) or a sensor.
+
+#### Electrical loads (`utenze`)
+
+Loads branch out of the house in a column. Each load is a "pill" with icon, name and value.
+
+In the visual editor use **Aggiungi utenza elettrica** (add electrical load). Keys of each load:
+
+| Key | Meaning |
+|---|---|
+| `entity` | the entity (power in W/kW, or any other sensor: state, percentage…) |
+| `nome` | name (default: the entity's name) |
+| `icona` | icon, e.g. `mdi:washing-machine` (default: the entity's icon) |
+| `colore` | colour |
+| `nascondi_a_zero` | `true` hides the load while it is off |
+| `soglia` | "on" above this value, in the sensor's unit |
+
+- When a load counts as "on":
+  - power: as soon as it is above 0;
+  - other numbers: above 0;
+  - states: when not "off" or "standby".
+- You can also paste the `individual` entries of power-flow-card-plus. The keys `name`, `icon`, `color`, `display_zero: false` and `display_zero_tolerance` are recognised.
+
+#### Options
+
+| Option | Effect |
+|---|---|
+| `title` | card title |
+| `nomi` | component names; `''` removes the label |
+| `colori` | icon and drawing colours: theme colour name (`red`, `blue`…), `#hex` or `[r, g, b]` |
+| `temperature` | per temperature `colora: true` and `min` / `max`: light blue to red scale |
+| `soglia_energia` | kW above which grid and battery are animated (default 0: any value) |
+| `batteria_inverti`, `rete_inverti` | `true` if the sensor uses the opposite sign |
+| `batteria_colora` | `true` colours the battery by charge: red when empty, bright green when full |
+| `batteria_min`, `batteria_max` | charge (%) at which the battery is red and green (default 0 and 100) |
+| `soglia_pdc`, `soglia_acs` | kW above which the heat pump or the hot-water cycle count as running (default 0.1) |
+| `acqua_portata_unita` | flow unit when the sensor declares a wrong one (`L/h`, `L/min`, `m³/h`…) |
+| `puffer` | `true` shows the break tank even without a booster pump |
+| `demo` | `true` shows sample data until an entity is set; it is the preview in the card picker |
+
+#### Check the version
+
+The browser console (F12) shows `PDC-FLOW-CARD v<version>`.

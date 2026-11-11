@@ -42,7 +42,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.21.0';
+const PDC_VERSION = '0.22.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -301,9 +301,9 @@ const PDC_FLOWS = {
 };
 
 // Sezione energia: altezza minima e posizione delle utenze
-const PDC_EH = 300;
+const PDC_EH = 292;
 // Utenze: cerchio con icona e valore dentro, nome a destra
-const PDC_U = { icon: 318, r: 19, text: 345, row: 46, bus: 180 };
+const PDC_U = { left: 298, w: 116, h: 34, icon: 315, text: 330, row: 40, bus: 180 };
 // Posizioni (centri) di rete, fotovoltaico/batteria e casa: con le utenze a destra, oppure su tutta la larghezza
 const PDC_E_LAYOUT = { utenze: { gx: 50, sx: 150, hx: 250 }, pieno: { gx: 56, sx: 210, hx: 362 } };
 // Linee dell'energia: ogni punto è collegato direttamente agli altri
@@ -317,12 +317,12 @@ function pdcEnergyPaths({ gx, sx, hx }) {
     e_inv2a: `M${sx + 30} 74 V88`,
     e_inv1b: `M${sx - 30} 122 C${sx - 30} 130 ${sx - 12} 134 ${sx} 134`,
     e_inv2b: `M${sx + 30} 122 C${sx + 30} 130 ${sx + 12} 134 ${sx} 134`,
-    e_sg: `M${sx - 6} 134 C${sx - 6} 162 ${gx + 56} 168 ${gx + 24} 168`,
+    e_sg: `M${sx - 6} 134 C${sx - 6} 162 ${gx + 58} 168 ${gx + 26} 168`,
     e_sh: `M${sx + 6} 134 C${sx + 6} 162 ${hx - 58} 168 ${hx - 26} 168`,
-    e_sb: `M${sx} 134 V212`,
-    e_gh: `M${gx + 24} 180 H${hx - 26}`,
-    e_gb: `M${gx + 24} 192 C${gx + 64} 192 ${bx - 47} 250 ${bx - 25} 250`,
-    e_bh: `M${bx + 25} 250 C${bx + 47} 250 ${hx - 66} 192 ${hx - 26} 192`,
+    e_sb: `M${sx} 134 V214`,
+    e_gh: `M${gx + 26} 180 H${hx - 26}`,
+    e_gb: `M${gx + 26} 192 C${gx + 64} 192 ${bx - 46} 249 ${bx - 24} 249`,
+    e_bh: `M${bx + 24} 249 C${bx + 46} 249 ${hx - 66} 192 ${hx - 26} 192`,
   };
 }
 
@@ -335,7 +335,7 @@ const PDC_IMP = 'M236 470 C233 466 234 461 238 459.5 C240.5 463.5 239.5 467.5 23
 const PDC_SVG_ENERGY = `
 <svg id="sv-e" x="0" y="0" width="420" height="${PDC_EH}" viewBox="0 0 420 ${PDC_EH}">
   <defs>
-    <clipPath id="cp-batt"><rect x="-25" y="212" width="50" height="76" rx="7"/></clipPath>
+    <clipPath id="cp-batt"><rect x="-24" y="218" width="48" height="62" rx="10"/></clipPath>
   </defs>
   <text x="18" y="24" class="sec" id="n-sezione_energia">ENERGIA</text>
 
@@ -349,34 +349,32 @@ const PDC_SVG_ENERGY = `
     <path class="rays" d="M70 11 V14 M70 34 V37 M57 24 H60 M80 24 H83 M60.8 14.8 L62.9 16.9 M77.1 31.1 L79.2 33.2 M60.8 33.2 L62.9 31.1 M77.1 16.9 L79.2 14.8"/>
     <path class="panel" d="M-52 74 L-40 32 H52 L40 74 Z"/>
     <path class="pgrid" d="M-21.3 74 L-9.3 32 M9.3 74 L21.3 32 M-46 53 H46"/>
-    <text x="0" y="58" class="val c halo" id="t-fv">—</text>
-    <text x="-60" y="58" class="lbl e" id="n-fotovoltaico">Fotovoltaico</text>
+    <text x="0" y="49" class="lbl c xs halo" id="n-fotovoltaico">Fotovoltaico</text>
+    <text x="0" y="65" class="val c halo" id="t-fv">—</text>
   </g>
 
   <!-- Inverter: valore dentro -->
   <g id="g-inv1" class="clickable" data-key="inverter_1_potenza">
     <rect class="box" x="-26" y="88" width="52" height="34" rx="8"/>
-    <path class="isym" d="M-18 94 H-10 M-18 97.5 H-10 M-5 95.75 H4 M1 93.25 L4 95.75 L1 98.25 M9 96.5 q2 -3.5 4 0 t4 0"/>
-    <text x="0" y="116" class="tv c" id="t-inv1">—</text>
-    <text x="-32" y="109" class="lbl e" id="n-inverter_1">Inverter 1</text>
+    <text x="0" y="101" class="lbl c xs" id="n-inverter_1">Inverter 1</text>
+    <text x="0" y="117" class="tv c" id="t-inv1">—</text>
   </g>
   <g id="g-inv2" class="clickable" data-key="inverter_2_potenza">
     <rect class="box" x="-26" y="88" width="52" height="34" rx="8"/>
-    <path class="isym" d="M-18 94 H-10 M-18 97.5 H-10 M-5 95.75 H4 M1 93.25 L4 95.75 L1 98.25 M9 96.5 q2 -3.5 4 0 t4 0"/>
-    <text x="0" y="116" class="tv c" id="t-inv2">—</text>
-    <text x="32" y="109" class="lbl" id="n-inverter_2">Inverter 2</text>
+    <text x="0" y="101" class="lbl c xs" id="n-inverter_2">Inverter 2</text>
+    <text x="0" y="117" class="tv c" id="t-inv2">—</text>
   </g>
 
   <!-- Rete: traliccio senza riquadro; cavi e scintilla animati solo quando la casa preleva -->
   <g id="g-grid" class="clickable" data-key="rete_potenza|rete_stato">
-    <rect class="hit" x="-44" y="-36" width="70" height="70"/>
-    <path class="gwire" d="M-44 -12 Q-32 -6 -20 -18 M-44 -2 Q-30 3 -16 -8"/>
-    <path class="tower" d="M0 -30 L-18 30 M0 -30 L18 30 M-20 -22 H20 M-16 -12 H16 M-6 -10 L9.6 2 M6 -10 L-9.6 2 M-22 30 H22"/>
-    <path class="ins" d="M-20 -22 v4 M20 -22 v4 M-16 -12 v4 M16 -12 v4"/>
-    <path class="gspark" d="M27 -38 L22 -30 H26 L24 -23 L30 -32 H26 Z"/>
-    <text x="0" y="20" class="tv c halo" id="t-grid">—</text>
-    <text x="0" y="46" class="lbl c" id="n-rete_elettrica">Rete</text>
-    <text x="0" y="58" class="lbl c xs" id="t-grid-dir"></text>
+    <rect class="hit" x="-46" y="-40" width="74" height="80"/>
+    <path class="gwire" d="M-46 -16 Q-34 -10 -22 -22 M-46 -6 Q-32 -1 -18 -12"/>
+    <path class="tower" d="M0 -34 L-25 36 M0 -34 L25 36 M-22 -26 H22 M-18 -16 H18 M-6.4 -16 L11.8 -2 M6.4 -16 L-11.8 -2 M-29 36 H29"/>
+    <path class="ins" d="M-22 -26 v4 M22 -26 v4 M-18 -16 v4 M18 -16 v4"/>
+    <path class="gspark" d="M29 -42 L24 -34 H28 L26 -27 L32 -36 H28 Z"/>
+    <text x="0" y="8" class="lbl c xs halo" id="n-rete_elettrica">Rete</text>
+    <text x="0" y="21" class="tv c halo" id="t-grid">—</text>
+    <text x="0" y="31" class="lbl c xs halo" id="t-grid-dir"></text>
   </g>
 
   <!-- Casa: senza riquadro, valore dentro -->
@@ -384,22 +382,20 @@ const PDC_SVG_ENERGY = `
     <rect class="hit" x="-32" y="-34" width="64" height="64"/>
     <path class="roof" d="M-30 -6 L0 -32 L30 -6 Z"/>
     <path class="ico2" d="M17 -17.3 V-28 H22 V-12.9 M-24 -6 V28 H24 V-6"/>
-    <text x="0" y="17" class="val c" id="t-casa">—</text>
-    <text x="0" y="46" class="lbl c" id="n-casa">Casa</text>
+    <text x="0" y="7" class="lbl c xs" id="n-casa">Casa</text>
+    <text x="0" y="22" class="val c" id="t-casa">—</text>
   </g>
 
   <!-- Batteria (sotto): carica e potenza dentro -->
   <g id="g-batt" class="clickable" data-key="batteria_livello|batteria_potenza">
-    <!-- batteria domestica a lastra: niente simboli, una striscia luminosa sul lato -->
-    <rect class="tank" x="-25" y="212" width="50" height="76" rx="7"/>
-    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="-25" y="288" width="50" height="0"/>
-    <rect class="bbevel" x="-21" y="216" width="42" height="68" rx="4.5"/>
-    <rect class="tank-o" x="-25" y="212" width="50" height="76" rx="7"/>
-    <rect class="bled" id="b-led" x="17.5" y="224" width="2.6" height="52" rx="1.3"/>
-    <text x="-2" y="252" class="mval c halo" id="t-soc"></text>
-    <text x="-2" y="268" class="tv c xs halo" id="t-batt">—</text>
-    <text x="-33" y="266" class="lbl e" id="n-batteria">Batteria</text>
-    <text x="-33" y="279" class="lbl e xs" id="t-batt-dir"></text>
+    <rect class="bterm" x="-9" y="214" width="18" height="4" rx="1.5"/>
+    <rect class="tank" x="-24" y="218" width="48" height="62" rx="10"/>
+    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="-24" y="280" width="48" height="0"/>
+    <rect class="tank-o" x="-24" y="218" width="48" height="62" rx="10"/>
+    <path class="bbolt" id="b-bolt" d="M1.5 221.5 L-3 228.5 H0 L-1.5 234 L3 226.5 H0 Z"/>
+    <text x="0" y="244" class="lbl c xs halo" id="n-batteria">Batteria</text>
+    <text x="0" y="261" class="mval c halo" id="t-soc"></text>
+    <text x="0" y="274" class="tv c xs halo" id="t-batt">—</text>
   </g>
 
   <g id="g-utenze"></g>
@@ -682,9 +678,8 @@ const PDC_CSS = `
   .pmi  { fill: var(--c, var(--pdc-idle)); }
   .pms  { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
   .pmi.dim, .pms.dim { opacity: .4; }
-  .bled { fill: var(--c, var(--pdc-idle)); opacity: .35; transition: opacity .5s; }
-  .bled.on { opacity: 1; }
-  .bbevel { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1; opacity: .25; }
+  .bbolt { fill: var(--c, var(--pdc-idle)); fill-opacity: .9; opacity: 0; transition: opacity .4s; }
+  .bbolt.on { opacity: 1; }
   .flow.thin { transition: opacity .4s; }
   .flow.thin:not(.on) { opacity: 0; }
   .uico { fill: var(--c, var(--pdc-idle)); }
@@ -782,14 +777,14 @@ class PdcFlowCard extends HTMLElement {
       mk('path', { class: 'pipe', d: '' }, f);
       mk('path', { class: 'dots', d: '' }, f);
       const g = mk('g', { id: `u${i}`, class: 'clickable', 'data-entity': u.entity }, rows);
-      mk('circle', { class: 'ubox', cx: U.icon, cy: 0, r: U.r }, g);
-      const k = 0.6;
-      const ico = mk('path', { id: `u${i}-ico`, class: 'uico', d: PDC_ICON_FALLBACK, transform: `translate(${U.icon - 12 * k} ${-6 - 12 * k}) scale(${k})` }, g);
-      const n = mk('text', { id: `u${i}-n`, class: 'lbl sm', x: U.text, y: 4 }, g);
-      mk('text', { id: `u${i}-v`, class: 'tv xs c', x: U.icon, y: 13 }, g);
+      mk('rect', { class: 'ubox', x: U.left, y: -U.h / 2, width: U.w, height: U.h, rx: U.h / 2 }, g);
+      const k = 0.65;
+      const ico = mk('path', { id: `u${i}-ico`, class: 'uico', d: PDC_ICON_FALLBACK, transform: `translate(${U.icon - 12 * k} ${-12 * k}) scale(${k})` }, g);
+      const n = mk('text', { id: `u${i}-n`, class: 'lbl xs', x: U.text, y: -2 }, g);
+      mk('text', { id: `u${i}-v`, class: 'tv xs', x: U.text, y: 11 }, g);
       const st = this._hass && this._hass.states[u.entity];
       let name = u.nome !== undefined && u.nome !== null ? String(u.nome) : (st && st.attributes.friendly_name) || u.entity;
-      if (name.length > 15) name = name.slice(0, 14) + '…';
+      if (name.length > 14) name = name.slice(0, 13) + '…';
       n.textContent = name;
       const icon = u.icona || (st && st.attributes.icon);
       if (icon) pdcLoadIcon(icon).then((d) => d && ico.setAttribute('d', d));
@@ -1244,7 +1239,7 @@ class PdcFlowCard extends HTMLElement {
       }
       // Stati tipo "Xxx.EnumType.PowerState.Off": resta solo l'ultima parte; testi lunghi accorciati
       if (/^[^\s]+\.[^\s]+$/.test(txt) && isNaN(parseFloat(txt))) txt = txt.split('.').pop();
-      if (txt.length > 8) txt = txt.slice(0, 7) + '…';
+      if (txt.length > 12) txt = txt.slice(0, 11) + '…';
       const cu = pdcCustomColor(u.colore) || PDC_U_COLORS[i % PDC_U_COLORS.length];
       const visible = !(u.nascondi && !on);
       this._show(`u${i}`, visible);
@@ -1315,10 +1310,10 @@ class PdcFlowCard extends HTMLElement {
 
     // Batteria
     this._color('g-batt', cBat);
-    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 212, 76, cBat);
+    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 218, 62, cBat);
     this._text('t-soc', soc === null ? '' : f0(soc) + '%');
     paint('n-batteria', cSoc);
-    this._els['b-led'].classList.toggle('on', batChg || batDis);
+    this._els['b-bolt'].classList.toggle('on', batChg);
     this._text('t-batt', pBat === null ? '' : fmtP(pBat), batDis || batChg || cSoc ? cBatTxt : '');
     this._text('t-batt-dir', batChg ? 'in carica' : batDis ? 'in scarica' : '');
 
@@ -1339,7 +1334,7 @@ class PdcFlowCard extends HTMLElement {
     const from = lay.hx + 26;
     shown.forEach((i, k) => {
       const y = ys[k];
-      const x1 = U.icon - U.r;
+      const x1 = U.left;
       this._els[`u${i}`].setAttribute('transform', `translate(0 ${y})`);
       const d = `M${from} ${U.bus} C${from + 14} ${U.bus} ${x1 - 14} ${y} ${x1} ${y}`;
       const g = this._els[`f-u${i}`];
