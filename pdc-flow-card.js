@@ -12,7 +12,8 @@
  *   type: custom:pdc-flow-card
  *   entities:            # ogni componente compare solo se la sua entità è impostata
  *     (energia) fv_potenza, inverter_1_potenza, inverter_2_potenza, batteria_livello, batteria_potenza (+ = in scarica),
- *     rete_potenza (+ = prelievo), rete_stato (on = rete collegata), casa_potenza
+ *     rete_potenza (+ = prelievo), rete_stato (on = rete collegata), casa_potenza,
+ *     temperatura_esterna (in alto a sinistra della parte energia; senza energia, nel titolo dell'impianto)
  *   utenze:              # facoltativo: utenze elettriche che escono dalla casa
  *     - entity: sensor.lavatrice_potenza
  *       nome: Lavatrice
@@ -20,7 +21,7 @@
  *       colore: teal              # facoltativo
  *       nascondi_a_zero: true     # facoltativo: la riga sparisce quando è spenta
  *       soglia: 5                 # facoltativo: accesa sopra questo valore (unità del sensore)
- *     temperatura_esterna, pdc_potenza (anche lista), riscaldamento, raffrescamento,
+ *     pdc_potenza (anche lista), riscaldamento, raffrescamento,
  *     acs_potenza | acs_attiva, pdc_mandata, pdc_ritorno, acs_temperatura,
  *     accumulo_temperatura, accumulo_ingresso, circolatore, pavimento_mandata,
  *     pavimento_ritorno, acqua_valvola | acqua_stop, acqua_portata, acqua_totale | acqua_oggi,
@@ -40,13 +41,14 @@
  *   (sole: sun.sun, fv_previsione: potenza prevista adesso, meteo: weather; servono per luna e nuvola)
  *   fv_compatto: false         # facoltativo: senza produzione il fotovoltaico resta grande (predefinito: si rimpicciolisce)
  *   alba_tramonto: false       # facoltativo: nasconde l'ora di alba (a sinistra) e tramonto (a destra) dei pannelli
+ *   acqua_separata: true       # facoltativo: rete e stop come icone a sé (predefinito: dentro il contatore, con il totale)
  *   demo: true                 # facoltativo: dati di esempio finché non si imposta un'entità
  *   batteria_inverti / rete_inverti: true   # facoltativo: segno opposto della potenza
  *   batteria_colora: true      # facoltativo: batteria da rosso (scarica) a verde (carica); batteria_min / batteria_max in %
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.25.0';
+const PDC_VERSION = '0.26.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -106,9 +108,9 @@ const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k)
 
 // Ordine delle chiavi nello YAML scritto dall'editor: energia, pompa di calore e impianto, acqua sanitaria
 const PDC_ENTITY_ORDER = [
-  'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
+  'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
   'rete_potenza', 'rete_stato', 'casa_potenza',
-  'temperatura_esterna', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
+  'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
   'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
   'acqua_valvola', 'acqua_stop', 'acqua_portata', 'acqua_totale', 'acqua_oggi',
@@ -119,7 +121,7 @@ const PDC_CONFIG_ORDER = [
   'type', 'title', 'demo', 'entities', 'utenze',
   'fv_compatto', 'alba_tramonto', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max',
   'soglia_pdc', 'soglia_acs', 'temperature',
-  'acqua_portata_unita', 'puffer',
+  'acqua_portata_unita', 'acqua_separata', 'puffer',
   'nomi', 'colori',
 ];
 function pdcOrderConfig(cfg) {
@@ -160,6 +162,7 @@ const PDC_DEMO = {
   acqua_valvola: ['switch', 'on'],
   acqua_portata: ['sensor', 8.4, 'L/min'],
   acqua_oggi: ['sensor', 186, 'L'],
+  acqua_totale: ['sensor', 412.37, 'm³'],
   ricircolo: ['switch', 'on'],
   autoclave_velocita: ['sensor', 3780, 'rpm'],
   autoclave_pressione: ['sensor', 2.9, 'bar'],
@@ -593,14 +596,19 @@ ${PDC_SVG_ENERGY}
     <text x="81" y="476" class="tv c xs" id="t-stop">—</text>
   </g>
 
-  <!-- Contatore: nome, portata e litri di oggi dentro -->
+  <!-- Contatore: nome, portata, litri di oggi, totale e valvola dentro (posizioni in _layoutMeter) -->
   <g id="g-meter" class="clickable" data-key="acqua_portata|acqua_totale|acqua_oggi">
-    <circle class="box" cx="141" cy="450" r="34"/>
-    <circle class="mring" cx="141" cy="450" r="31"/>
+    <circle class="box" id="m-box" cx="141" cy="450" r="34"/>
+    <circle class="mring" id="m-ring" cx="141" cy="450" r="31"/>
     <text x="141" y="436" class="lbl c xs halo" id="n-contatore">Contatore</text>
-    <text x="141" y="454" class="mval c" id="t-lpm">—</text>
-    <text x="141" y="464" class="lbl c xs">L/min</text>
+    <text x="141" y="455" class="c" id="m-lpm"><tspan class="mval" id="t-lpm">—</tspan><tspan class="lbl xs" id="m-unit" dx="3">L/min</tspan></text>
     <text x="141" y="475" class="lbl c xs halo" id="t-oggi"></text>
+    <text x="141" y="486" class="lbl c xs halo hidden" id="t-mtot"></text>
+    <!-- valvola comandata dal contatore: toccandola si apre la valvola -->
+    <g id="m-valve" class="clickable hidden" data-key="acqua_valvola|acqua_stop">
+      <path class="mvalve" id="m-vico" d="M-5 -3.5 L5 3.5 V-3.5 L-5 3.5 Z"/>
+      <text x="0" y="0" class="tv xs" id="t-mvalve"></text>
+    </g>
   </g>
 
   <!-- Puffer: nome dentro -->
@@ -704,6 +712,7 @@ const PDC_CSS = `
   .valve    { fill: var(--c, var(--pdc-idle)); fill-opacity: 1; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; stroke-linejoin: round; }
   .stem     { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linecap: round; }
   .mring    { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1; stroke-dasharray: 2 3; opacity: .6; }
+  .mvalve   { fill: var(--v, var(--pdc-idle)); stroke: var(--v, var(--pdc-idle)); stroke-width: 1.2; stroke-linejoin: round; }
   .div      { stroke: var(--divider-color, rgba(127,127,127,.25)); stroke-width: 1; }
   .jn       { fill: var(--c, var(--pdc-idle)); }
   .panel    { fill: var(--c, var(--pdc-idle)); fill-opacity: .18; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linejoin: round; }
@@ -990,6 +999,59 @@ class PdcFlowCard extends HTMLElement {
     return Math.max(0, v);
   }
 
+  // Temperatura esterna: in alto a sinistra della parte energia (dopo il titolo, se il titolo è visibile);
+  // senza la parte energia resta nel titolo dell'impianto
+  _placeExt(inEnergy) {
+    const g = this._els['g-ext'];
+    const host = this._els[inEnergy ? 'sv-e' : 'sv-m'];
+    if (!g || !host) return;
+    if (g.parentNode !== host) host.appendChild(g);
+    let tr = 'translate(140 -3)';
+    if (inEnergy) {
+      const h = this._els['n-sezione_energia'];
+      const txt = h ? h.textContent : '';
+      if (this._extHdr !== txt || !this._extW) {
+        let w = 0;
+        try {
+          w = txt ? h.getComputedTextLength() : 0;
+        } catch (e) {
+          w = 0;
+        }
+        if (txt && !w) w = txt.length * 7.6; // titolo non ancora disegnato: larghezza stimata
+        this._extW = txt ? 18 + w + 12 : 18;
+        this._extHdr = txt;
+      }
+      // l'icona del termometro inizia a x 19.5 nel gruppo
+      tr = `translate(${(this._extW - 19.5).toFixed(1)} -3)`;
+    }
+    if (g.getAttribute('transform') !== tr) g.setAttribute('transform', tr);
+  }
+
+  // Contatore: piccolo (r 34, accanto a rete e stop) oppure più grande (r 42) con totale e valvola dentro
+  _layoutMeter(merge) {
+    const cx = merge ? 80 : 141;
+    const cy = 450;
+    const r = merge ? 45 : 34;
+    const set = (id, attrs) => {
+      const el = this._els[id];
+      if (el) for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    };
+    set('m-box', { cx, cy, r });
+    set('m-ring', { cx, cy, r: r - 3 });
+    // righe: nome, portata con unità, litri di oggi, totale, valvola
+    const dy = merge ? { n: -25, v: -7, o: 7, t: 19 } : { n: -13, v: 5, o: 19, t: 31 };
+    set('n-contatore', { x: cx, y: cy + dy.n });
+    set('m-lpm', { x: cx, y: cy + dy.v });
+    set('t-oggi', { x: cx, y: cy + dy.o });
+    set('t-mtot', { x: cx, y: cy + dy.t });
+    // valvola in basso: icona e "aperta/chiusa", centrate
+    set('m-vico', { transform: `translate(${cx - 17} ${cy + 27.5})` });
+    set('t-mvalve', { x: cx - 9, y: cy + 31 });
+    // la linea dell'acqua entra dal bordo sinistro (senza icona della rete) oppure dall'icona della rete
+    const wa = merge ? 'M12 450 H202' : PDC_FLOWS.wa;
+    this._els['f-wa'].querySelectorAll('path').forEach((p) => p.setAttribute('d', wa));
+  }
+
   // Ora (hh:mm) come nel profilo utente di HA: lingua, 12/24 ore e fuso del server se scelto
   _time(iso) {
     if (!iso) return '—';
@@ -1078,6 +1140,7 @@ class PdcFlowCard extends HTMLElement {
     const [L, O] = this._numberLocale();
     const f1 = (v) => v.toLocaleString(L, { ...O, minimumFractionDigits: 1, maximumFractionDigits: 1 });
     const f0 = (v) => Math.round(v).toLocaleString(L, { ...O, maximumFractionDigits: 0 });
+    const f2 = (v) => v.toLocaleString(L, { ...O, minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fT = (v) => (v === null ? '—' : f1(v) + '°');
     const has = (k) => this._has(k);
 
@@ -1097,7 +1160,6 @@ class PdcFlowCard extends HTMLElement {
     const RIC = has('ricircolo');
     const SENT = has('sentina_potenza') || has('sentina_energia') || has('sentina_stato');
     const WATER = STOP || METER || OGGI || RIC || PUFFER || SENT;
-    const ANY = PDC_MAIN_KEYS.some((k) => has(k));
     const INV1 = has('inverter_1_potenza');
     const INV2 = has('inverter_2_potenza');
     const FV = has('fv_potenza') || INV1 || INV2;
@@ -1105,6 +1167,8 @@ class PdcFlowCard extends HTMLElement {
     const GRID = has('rete_potenza');
     const HOME = has('casa_potenza');
     const EN = FV || BATT || GRID || HOME || has('rete_stato') || this._utenze.length > 0;
+    // la temperatura esterna sta nella parte energia; nell'impianto solo se la parte energia non c'è
+    const ANY = PDC_MAIN_KEYS.some((k) => k !== 'temperatura_esterna' && has(k)) || (!EN && has('temperatura_esterna'));
     const MAIN = ANY || !EN;
 
     // ---- Valori ----
@@ -1194,6 +1258,7 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['div-e'], EN && MAIN);
     this._vis(['n-sezione_impianto'], ANY);
     this._vis(['g-ext'], has('temperatura_esterna'));
+    this._placeExt(EN);
     this._vis(['g-pdc', 't-pdc-pow', 't-pdc-mode', 'n-pompa_di_calore'], PDC);
     this._vis(['f-s1', 'f-r2b'], showS1);
     this._vis(['f-coil', 'f-r2a'], PDC && BOIL);
@@ -1211,9 +1276,18 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['g-pump', 'n-circolatore'], PUMP);
     this._vis(['f-fs', 'f-fr'], ACCU && FLOOR);
     this._vis(['g-ftemps'], FTEMPS);
-    this._vis(['div-a', 'n-sezione_acqua', 'g-rete', 'n-rete', 'f-wa', 'f-wb', 'f-wout', 'g-tap', 'n-rubinetto'], WATER);
-    this._vis(['g-stop'], WATER && STOP);
+    // Con il contatore: rete e stop stanno dentro il contatore (più grande), salvo "acqua_separata: true"
+    const MERGE = c.acqua_separata !== true && (METER || OGGI);
+    this._vis(['div-a', 'n-sezione_acqua', 'f-wa', 'f-wb', 'f-wout', 'g-tap', 'n-rubinetto'], WATER);
+    this._vis(['g-rete', 'n-rete'], WATER && !MERGE);
+    this._vis(['g-stop'], WATER && STOP && !MERGE);
     this._vis(['g-meter'], WATER && (METER || OGGI));
+    this._vis(['m-valve'], MERGE && STOP);
+    this._vis(['t-mtot'], MERGE && has('acqua_totale'));
+    if (this._merge !== MERGE) {
+      this._layoutMeter(MERGE);
+      this._merge = MERGE;
+    }
     this._vis(['g-puffer'], WATER && PUFFER);
     this._vis(['g-auto'], WATER && AC);
     this._vis(['f-whot', 'jn-w', 'g-rpump', 'n-ricircolo'], WATER && BOIL && RIC);
@@ -1397,7 +1471,7 @@ class PdcFlowCard extends HTMLElement {
       this._els['t-fv'].setAttribute('y', COMPACT ? 56 : 65);
       // alba e tramonto più vicini al pannello piccolo
       const tx = COMPACT ? 46 : 58;
-      const ty = COMPACT ? 50 : 55;
+      const ty = COMPACT ? 52 : 55;
       for (const [id, x, y] of [['n-alba', -tx, ty], ['t-alba', -tx, ty + 12], ['n-tramonto', tx, ty], ['t-tramonto', tx, ty + 12]]) {
         this._els[id].setAttribute('x', x);
         this._els[id].setAttribute('y', y);
@@ -1494,11 +1568,14 @@ class PdcFlowCard extends HTMLElement {
       this._els['div-e'].setAttribute('y2', eh - 1);
       this._eH = eh;
     }
-    const h = (EN ? eh : 0) + (MAIN ? hm : 0);
-    if (this._vbH !== h) {
+    // Titolo "IMPIANTO" nascosto e temperatura nella parte energia: l'impianto sale di 14
+    const mUp = EN && MAIN && !this._els['n-sezione_impianto'].textContent ? 14 : 0;
+    const h = (EN ? eh : 0) + (MAIN ? hm - mUp : 0);
+    if (this._vbH !== h || this._mUp !== mUp) {
       this._svg.setAttribute('viewBox', `0 0 420 ${h}`);
-      this._els['sv-m'].setAttribute('y', EN ? eh : 0);
+      this._els['sv-m'].setAttribute('y', (EN ? eh : 0) - mUp);
       this._vbH = h;
+      this._mUp = mUp;
     }
 
     // ---- Pompa di calore ----
@@ -1601,6 +1678,15 @@ class PdcFlowCard extends HTMLElement {
 
     this._color('g-meter', fixed('contatore') || (meterFlow ? COLD : null));
     this._text('t-lpm', lpm === null ? '—' : f1(lpm));
+    // Totale del contatore (m³ con due decimali, litri senza) e valvola comandata dal contatore
+    const stTot = this._st('acqua_totale');
+    const vTot = stTot ? parseFloat(stTot.state) : NaN;
+    const uTot = stTot ? String(stTot.attributes.unit_of_measurement || 'm³') : '';
+    this._text('t-mtot', isNaN(vTot) ? '' : (/^l$/i.test(uTot) ? f0(vTot) : f2(vTot)) + ' ' + uTot);
+    const cValve = stopState === null ? null : stopState ? PDC_COL.closed : openCol;
+    if (cValve) this._els['m-valve'].style.setProperty('--v', cValve);
+    else this._els['m-valve'].style.removeProperty('--v');
+    this._text('t-mvalve', stopState === null ? '—' : stopState ? 'chiusa' : 'aperta', cValve || '');
 
     // Rete -> contatore -> puffer segue il contatore; se il contatore non c'è segue il flusso verso casa
     this._flow('wa', METER ? meterFlow : outFlow, COLD, METER ? durM : durW);
@@ -1656,7 +1742,6 @@ class PdcFlowCard extends HTMLElement {
         if (u === 'Wh') kwh /= 1000;
         else if (u === 'MWh') kwh *= 1000;
       }
-      const f2 = (v) => v.toLocaleString(L, { ...O, minimumFractionDigits: 2, maximumFractionDigits: 2 });
       this._text('t-sent-kwh', isNaN(kwh) ? '' : (kwh < 10 ? f2(kwh) : f1(kwh)) + ' kWh');
       this._flow('ws', sRun, cSent, 1.6);
     }
@@ -1776,6 +1861,7 @@ const PDC_FIELD_SELECTORS = {
   acqua_totale: PDC_SENSOR,
   acqua_oggi: PDC_SENSOR,
   puffer: { boolean: {} },
+  acqua_separata: { boolean: {} },
   autoclave_velocita: PDC_SENSOR,
   autoclave_pressione: PDC_SENSOR,
   autoclave_portata: PDC_SENSOR,
@@ -1805,7 +1891,7 @@ const PDC_GROUPS = [
   ['pavimento', 'Pavimento', 'mdi:heating-coil', ['pavimento_mandata', 'pavimento_ritorno', 'nome_pavimento', 'colore_pavimento', 'tcolora_pavimento', 'tmin_pavimento', 'tmax_pavimento']],
   ['rete', 'Rete e linee acqua', 'mdi:water', ['nome_rete', 'colore_rete', 'colore_acqua_fredda']],
   ['stop', 'Stop acqua', 'mdi:pipe-valve', ['acqua_valvola', 'nome_stop', 'colore_stop']],
-  ['contatore', 'Contatore', 'mdi:counter', ['acqua_portata', 'acqua_portata_unita', 'acqua_totale', 'acqua_oggi', 'nome_contatore', 'colore_contatore']],
+  ['contatore', 'Contatore', 'mdi:counter', ['acqua_portata', 'acqua_portata_unita', 'acqua_totale', 'acqua_oggi', 'acqua_separata', 'nome_contatore', 'colore_contatore']],
   ['puffer', 'Puffer', 'mdi:storage-tank-outline', ['puffer', 'nome_puffer', 'colore_puffer']],
   ['autoclave', 'Autoclave', 'mdi:water-pump', ['autoclave_velocita', 'autoclave_pressione', 'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'nome_autoclave', 'colore_autoclave']],
   ['ricircolo', 'Ricircolo', 'mdi:reload', ['ricircolo', 'nome_ricircolo', 'colore_ricircolo']],
@@ -1813,7 +1899,7 @@ const PDC_GROUPS = [
   ['sentina', 'Pompa sentina', 'mdi:water-pump', ['sentina_potenza', 'sentina_energia', 'sentina_stato', 'nome_sentina', 'colore_sentina']],
 ];
 
-const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto'];
+const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto', 'acqua_separata'];
 
 const PDC_TNUM = { number: { min: -30, max: 100, step: 1, mode: 'box', unit_of_measurement: '°C' } };
 
@@ -1848,9 +1934,9 @@ const PDC_U_SELECTORS = {
 // Le tre parti della card, nello stesso ordine del disegno: [chiave, titolo, icona, campi della sezione, gruppi]
 const PDC_SECTIONS = [
   ['energia', 'Energia', 'mdi:lightning-bolt', ['nome_sezione_energia', 'soglia_energia'],
-    ['fotovoltaico', 'batteria', 'rete_elettrica', 'casa']],
+    ['esterno', 'fotovoltaico', 'batteria', 'rete_elettrica', 'casa']],
   ['impianto', 'Pompa di calore e impianto', 'mdi:heat-pump', ['nome_sezione_impianto', 'nome_setpoint'],
-    ['esterno', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo', 'ingresso_accumulo', 'circolatore', 'pavimento']],
+    ['pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo', 'ingresso_accumulo', 'circolatore', 'pavimento']],
   ['acqua', 'Acqua sanitaria', 'mdi:water', ['nome_sezione_acqua'],
     ['rete', 'stop', 'contatore', 'puffer', 'autoclave', 'ricircolo', 'rubinetto', 'sentina']],
 ];
@@ -1936,9 +2022,10 @@ const PDC_LABELS = {
   acqua_valvola: 'Valvola (on = aperta)',
   acqua_portata: 'Portata',
   acqua_portata_unita: 'Unità della portata',
-  acqua_totale: 'Contatore totale (calcola i litri di oggi)',
+  acqua_totale: 'Contatore totale (m³ dentro il contatore; calcola anche i litri di oggi)',
   acqua_oggi: 'Oppure: litri di oggi',
   puffer: 'Mostra anche senza autoclave',
+  acqua_separata: 'Rete e stop come icone separate (non dentro il contatore)',
   autoclave_velocita: 'Velocità (giri/min)',
   autoclave_pressione: 'Pressione',
   autoclave_portata: 'Portata',
@@ -2127,6 +2214,7 @@ class PdcFlowCardEditor extends HTMLElement {
     }
     if (cfg.acqua_portata_unita === 'auto') delete cfg.acqua_portata_unita;
     if (!cfg.puffer) delete cfg.puffer;
+    if (!cfg.acqua_separata) delete cfg.acqua_separata;
     if (!cfg.batteria_inverti) delete cfg.batteria_inverti;
     if (!cfg.batteria_colora) delete cfg.batteria_colora;
     if (!cfg.rete_inverti) delete cfg.rete_inverti;

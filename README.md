@@ -16,13 +16,14 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia di
   - Nomi e valori sono dentro le icone.
   - Il traliccio si anima quando la casa preleva dalla rete.
   - Dalla casa escono le utenze elettriche che scegli tu. Se nessuna è accesa, il disegno usa tutta la larghezza.
+  - In alto a sinistra c'è la temperatura esterna.
   - Ai lati dei pannelli ci sono l'ora dell'alba (a sinistra) e del tramonto (a destra), presi dal sole di Home Assistant.
   - Quando il fotovoltaico non produce, il pannello diventa più piccolo, gli inverter spariscono e al posto del sole compare la luna (di notte) o una nuvola (di giorno, con il brutto tempo).
 - **Impianto:**
   - pompa di calore con potenza, modalità e un'icona della funzione attiva (riscaldamento, raffrescamento, acqua sanitaria);
-  - temperatura esterna, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
+  - valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
 - **Acqua sanitaria:**
-  - rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto;
+  - contatore (L/min, litri di oggi, totale e valvola aperta/chiusa, tutto dentro il contatore), puffer, autoclave, ricircolo dal bollitore e rubinetto;
   - il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione;
   - sotto, in una seconda riga, la pompa sentina collegata al puffer, con stato ed energia consumata.
 
@@ -58,6 +59,7 @@ Esempio in YAML:
 type: custom:pdc-flow-card
 entities:
   # Energia
+  temperatura_esterna: sensor.temperatura_esterna
   fv_potenza: sensor.fotovoltaico_potenza
   inverter_1_potenza: sensor.inverter_1_potenza
   inverter_2_potenza: sensor.inverter_2_potenza
@@ -69,7 +71,6 @@ entities:
   rete_stato: binary_sensor.rete_collegata
   casa_potenza: sensor.casa_consumo
   # Pompa di calore e impianto
-  temperatura_esterna: sensor.temperatura_esterna
   pdc_potenza: sensor.pdc_potenza
   riscaldamento: binary_sensor.pdc_riscaldamento
   raffrescamento: binary_sensor.pdc_raffrescamento
@@ -106,7 +107,7 @@ entities:
 | `rete_potenza` | potenza della rete (positiva = prelievo, negativa = immissione) |
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
-| `temperatura_esterna` | temperatura esterna |
+| `temperatura_esterna` | temperatura esterna, in alto a sinistra della parte energia (senza la parte energia, nel titolo dell'impianto) |
 | `pdc_potenza` | potenza della pompa di calore (anche una lista di sensori, che vengono sommati) |
 | `riscaldamento`, `raffrescamento` | modalità attiva della pompa di calore |
 | `acs_potenza` oppure `acs_attiva` | potenza del ciclo acqua calda, oppure un'entità on/off |
@@ -115,9 +116,9 @@ entities:
 | `accumulo_temperatura`, `accumulo_ingresso`, `accumulo_setpoint` | temperatura, ingresso e setpoint dell'accumulo |
 | `circolatore` | circolatore del pavimento |
 | `pavimento_mandata`, `pavimento_ritorno` | temperature del pavimento |
-| `acqua_valvola` | valvola dell'acqua (on = aperta) |
+| `acqua_valvola` | valvola dell'acqua (on = aperta); con il contatore, lo stato compare dentro il contatore |
 | `acqua_portata` | portata istantanea |
-| `acqua_totale` oppure `acqua_oggi` | contatore totale (i litri di oggi vengono calcolati dalle statistiche) oppure litri del giorno |
+| `acqua_totale` oppure `acqua_oggi` | contatore totale (mostrato dentro il contatore; i litri di oggi vengono calcolati dalle statistiche) oppure litri del giorno |
 | `autoclave_velocita`, `autoclave_pressione`, `autoclave_portata`, `autoclave_stato` | dati dell'autoclave |
 | `autoclave_comando` | select (Abilita/Disabilita) o switch per bloccare l'autoclave |
 | `ricircolo` | pompa di ricircolo |
@@ -174,6 +175,7 @@ utenze:
 | `soglia_pdc`, `soglia_acs` | potenza in kW sopra cui la pompa o il ciclo acqua calda sono considerati accesi (predefinito 0,1) |
 | `acqua_portata_unita` | unità della portata se il sensore la dichiara male (`L/h`, `L/min`, `m³/h`…) |
 | `puffer` | `true` mostra il puffer anche senza autoclave |
+| `acqua_separata` | `true` mostra rete e stop come icone a sé, prima del contatore (predefinito: dentro il contatore) |
 | `demo` | `true` mostra dati di esempio finché non è impostata nessuna entità; è l'anteprima che compare nella scelta delle card |
 
 Esempio:
@@ -208,13 +210,14 @@ A Home Assistant dashboard card that draws an animated view of the home's energy
   - Names and values are inside the icons.
   - The pylon is animated while the house draws power from the grid.
   - Electrical loads you choose branch out of the house. When none is on, the drawing uses the full width.
+  - The outdoor temperature is in the top-left corner.
   - Next to the panels are the sunrise time (left) and sunset time (right), taken from Home Assistant's sun entity.
   - When the solar panels produce nothing, the panel gets smaller, the inverters are hidden and the sun is replaced by the moon (at night) or a cloud (in the daytime, with bad weather).
 - **Heating system:**
   - heat pump with power, mode and an icon of the active function (heating, cooling, hot water);
-  - outdoor temperature, 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints.
+  - 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints.
 - **Domestic water:**
-  - mains, shut-off valve, water meter (L/min and today's litres), break tank, booster pump, hot-water recirculation and tap;
+  - water meter (L/min, today's litres, total and shut-off valve open/closed, all inside the meter), break tank, booster pump, hot-water recirculation and tap;
   - the meter fills the break tank; water flows from the tank to the tap only while the booster pump is running;
   - below, on a second row, the sump pump connected to the break tank, with its status and energy used.
 
@@ -259,7 +262,7 @@ See the YAML example in the Italian section above: the keys are the same.
 | `rete_potenza` | grid power (positive = import, negative = export) |
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
 | `casa_potenza` | house consumption (calculated if missing) |
-| `temperatura_esterna` | outdoor temperature |
+| `temperatura_esterna` | outdoor temperature, top-left of the energy section (without the energy section, in the heating system title) |
 | `pdc_potenza` | heat pump power (also a list of sensors, which are added up) |
 | `riscaldamento`, `raffrescamento` | heating / cooling mode active |
 | `acs_potenza` or `acs_attiva` | hot-water cycle power, or an on/off entity |
@@ -268,9 +271,9 @@ See the YAML example in the Italian section above: the keys are the same.
 | `accumulo_temperatura`, `accumulo_ingresso`, `accumulo_setpoint` | buffer tank temperature, inlet and setpoint |
 | `circolatore` | underfloor circulator |
 | `pavimento_mandata`, `pavimento_ritorno` | underfloor flow and return temperatures |
-| `acqua_valvola` | water valve (on = open) |
+| `acqua_valvola` | water valve (on = open); with a meter, its state is shown inside the meter |
 | `acqua_portata` | instant water flow |
-| `acqua_totale` or `acqua_oggi` | total meter (today's litres come from statistics) or litres of the day |
+| `acqua_totale` or `acqua_oggi` | total meter (shown inside the meter; today's litres come from statistics) or litres of the day |
 | `autoclave_velocita`, `autoclave_pressione`, `autoclave_portata`, `autoclave_stato` | booster pump speed, pressure, flow and status |
 | `autoclave_comando` | select (Abilita/Disabilita = enable/disable) or switch to lock the booster pump |
 | `ricircolo` | recirculation pump |
@@ -318,6 +321,7 @@ In the visual editor use **Aggiungi utenza elettrica** (add electrical load). Ke
 | `soglia_pdc`, `soglia_acs` | kW above which the heat pump or the hot-water cycle count as running (default 0.1) |
 | `acqua_portata_unita` | flow unit when the sensor declares a wrong one (`L/h`, `L/min`, `m³/h`…) |
 | `puffer` | `true` shows the break tank even without a booster pump |
+| `acqua_separata` | `true` shows mains and shut-off valve as separate icons before the meter (default: inside the meter) |
 | `demo` | `true` shows sample data until an entity is set; it is the preview in the card picker |
 
 #### Check the version
