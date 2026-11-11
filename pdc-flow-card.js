@@ -48,7 +48,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.26.0';
+const PDC_VERSION = '0.27.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -310,14 +310,14 @@ const PDC_FLOWS = {
   floor: 'M82 214 H32 A8 8 0 0 0 32 230 H68 A8 8 0 0 1 68 246 H32 A8 8 0 0 0 32 262 H82',
   fr: 'M82 262 H156',
   // acqua (riga principale a 450; sotto, la seconda riga con la pompa sentina)
-  wa: 'M54 450 H202',
-  wb: 'M202 450 H331',
-  wout: 'M331 450 H350',
-  ws: 'M202 484 V514 Q202 522 194 522 H136',
-  whot: 'M331 230 V406',
+  wa: 'M54 436 H202',
+  wb: 'M202 436 H331',
+  wout: 'M331 436 H350',
+  ws: 'M202 478 V504 Q202 512 194 512 H162',
+  whot: 'M331 230 V392',
 };
 // Linea della sentina quando il puffer non c'è: parte dalla linea dell'acqua
-const PDC_WS_NOPUFFER = 'M202 450 V514 Q202 522 194 522 H136';
+const PDC_WS_NOPUFFER = 'M202 436 V504 Q202 512 194 512 H162';
 
 // Sezione energia: altezza minima e posizione delle utenze
 const PDC_EH = 292;
@@ -355,7 +355,7 @@ const pdcFlow = (id) =>
   `<g class="flow" id="f-${id}"><path class="pipe" d="${PDC_FLOWS[id]}"/><path class="dots" d="${PDC_FLOWS[id]}"/></g>`;
 
 const PDC_BLADE = 'M63 90 C57 81 60 69 70 66 C75 76 72 85 63 90 Z';
-const PDC_IMP = 'M259 436 C255.4 431.2 256.6 425.2 261.4 423.4 C264.4 428.2 263.2 433 259 436 Z';
+const PDC_IMP = 'M259 422 C255.4 417.2 256.6 411.2 261.4 409.4 C264.4 414.2 263.2 419 259 422 Z';
 
 const PDC_SVG_ENERGY = `
 <svg id="sv-e" x="0" y="0" width="420" height="${PDC_EH}" viewBox="0 0 420 ${PDC_EH}">
@@ -455,7 +455,7 @@ ${PDC_SVG_ENERGY}
   <defs>
     <clipPath id="cp-boiler"><rect x="258" y="50" width="146" height="180" rx="24"/></clipPath>
     <clipPath id="cp-accu"><rect x="156" y="196" width="88" height="80" rx="18"/></clipPath>
-    <clipPath id="cp-puffer"><rect x="182" y="400" width="40" height="84" rx="16"/></clipPath>
+    <clipPath id="cp-puffer"><rect x="182" y="394" width="40" height="84" rx="16"/></clipPath>
   </defs>
 
   <!-- ===== SEZIONE IMPIANTO ===== -->
@@ -563,6 +563,13 @@ ${PDC_SVG_ENERGY}
   <!-- ===== SEZIONE ACQUA SANITARIA ===== -->
   <text x="18" y="340" class="sec" id="n-sezione_acqua">ACQUA SANITARIA</text>
   ${pdcFlow('whot')}
+  <!-- Ricircolo: pompa sulla linea che scende dal bollitore, sotto il bollitore (parte impianto) -->
+  <g id="g-rpump" class="pump clickable" data-key="ricircolo">
+    <rect class="box" x="295" y="244" width="72" height="32" rx="10"/>
+    <circle class="pring" cx="310" cy="260" r="9"/>
+    <path class="ptri" d="M305.5 256 L310 264 L314.5 256 Z"/>
+    <text x="324" y="264" class="lbl xs" id="n-ricircolo">Ricircolo</text>
+  </g>
 
   <!-- Contenuto dell'acqua spostato 44 più in alto (stesse coordinate di prima) -->
   <svg id="sv-w" x="0" y="-44" width="420" height="600" viewBox="0 0 420 600">
@@ -570,30 +577,28 @@ ${PDC_SVG_ENERGY}
   ${pdcFlow('wb')}
   ${pdcFlow('wout')}
   ${pdcFlow('ws')}
-  <circle id="jn-w" class="jn" cx="331" cy="450" r="3.2"/>
+  <circle id="jn-w" class="jn" cx="331" cy="436" r="3.2"/>
 
-  <!-- Ricircolo: pompa sulla linea che scende dal bollitore, nome dentro -->
-  <g id="g-rpump" class="pump clickable" data-key="ricircolo">
-    <rect class="box" x="295" y="376" width="72" height="32" rx="10"/>
-    <circle class="pring" cx="310" cy="392" r="9"/>
-    <path class="ptri" d="M305.5 388 L310 396 L314.5 388 Z"/>
-    <text x="324" y="396" class="lbl xs" id="n-ricircolo">Ricircolo</text>
+  <!-- Inizio della linea (contatore unico): piccolo cerchio con la goccia -->
+  <g id="g-src">
+    <circle class="box" cx="22" cy="436" r="11"/>
+    <path class="drop" d="M22 429.5 C24.8 432.8 26.5 435.2 26.5 437.9 A4.5 4.5 0 0 1 17.5 437.9 C17.5 435.2 19.2 432.8 22 429.5 Z"/>
   </g>
 
   <!-- Rete -->
   <g id="g-rete">
-    <rect class="box" x="12" y="416" width="42" height="68" rx="10"/>
-    <path class="drop" d="M33 426 C37.5 431.5 40.5 435.5 40.5 440 A7.5 7.5 0 0 1 25.5 440 C25.5 435.5 28.5 431.5 33 426 Z"/>
-    <text x="33" y="474" class="lbl c xs" id="n-rete">Rete</text>
+    <rect class="box" x="12" y="402" width="42" height="68" rx="10"/>
+    <path class="drop" d="M33 412 C37.5 417.5 40.5 421.5 40.5 426 A7.5 7.5 0 0 1 25.5 426 C25.5 421.5 28.5 417.5 33 412 Z"/>
+    <text x="33" y="460" class="lbl c xs" id="n-rete">Rete</text>
   </g>
 
   <!-- Stop acqua -->
   <g id="g-stop" class="clickable" data-key="acqua_valvola|acqua_stop">
-    <rect class="box" x="60" y="416" width="42" height="68" rx="10"/>
-    <path class="valve" d="M72 435 L90 447 V435 L72 447 Z"/>
-    <path class="stem" d="M81 441 V429 M76.5 429 H85.5"/>
-    <text x="81" y="464" class="lbl c xs" id="n-stop">Stop</text>
-    <text x="81" y="476" class="tv c xs" id="t-stop">—</text>
+    <rect class="box" x="60" y="402" width="42" height="68" rx="10"/>
+    <path class="valve" d="M72 421 L90 433 V421 L72 433 Z"/>
+    <path class="stem" d="M81 427 V415 M76.5 415 H85.5"/>
+    <text x="81" y="450" class="lbl c xs" id="n-stop">Stop</text>
+    <text x="81" y="462" class="tv c xs" id="t-stop">—</text>
   </g>
 
   <!-- Contatore: nome, portata, litri di oggi, totale e valvola dentro (posizioni in _layoutMeter) -->
@@ -613,46 +618,46 @@ ${PDC_SVG_ENERGY}
 
   <!-- Puffer: nome dentro -->
   <g id="g-puffer">
-    <rect class="tank" x="182" y="400" width="40" height="84" rx="16"/>
-    <rect id="fill-puffer" class="fill" clip-path="url(#cp-puffer)" x="182" y="420" width="40" height="64"/>
-    <rect class="tank-o" x="182" y="400" width="40" height="84" rx="16"/>
-    <text x="202" y="415" class="lbl c xs halo" id="n-puffer">Puffer</text>
+    <rect class="tank" x="182" y="394" width="40" height="84" rx="16"/>
+    <rect id="fill-puffer" class="fill" clip-path="url(#cp-puffer)" x="182" y="414" width="40" height="64"/>
+    <rect class="tank-o" x="182" y="394" width="40" height="84" rx="16"/>
+    <text x="202" y="409" class="lbl c xs halo" id="n-puffer">Puffer</text>
   </g>
 
   <!-- Autoclave: girante, nome, stato e pressione dentro -->
   <g id="g-auto" class="clickable" data-key="autoclave_comando|autoclave_velocita|autoclave_portata|autoclave_pressione|autoclave_stato">
-    <rect class="box" x="230" y="416" width="58" height="68" rx="10"/>
+    <rect class="box" x="230" y="402" width="58" height="68" rx="10"/>
     <g class="imp">
       <path class="blade" d="${PDC_IMP}"/>
-      <path class="blade" d="${PDC_IMP}" transform="rotate(90 259 436)"/>
-      <path class="blade" d="${PDC_IMP}" transform="rotate(180 259 436)"/>
-      <path class="blade" d="${PDC_IMP}" transform="rotate(270 259 436)"/>
+      <path class="blade" d="${PDC_IMP}" transform="rotate(90 259 422)"/>
+      <path class="blade" d="${PDC_IMP}" transform="rotate(180 259 422)"/>
+      <path class="blade" d="${PDC_IMP}" transform="rotate(270 259 422)"/>
     </g>
-    <circle class="hub" cx="259" cy="436" r="2.8"/>
-    <text x="259" y="460" class="lbl c xs" id="n-autoclave">Autoclave</text>
-    <text x="259" y="471" class="tv c xs" id="t-ac-rpm">—</text>
-    <text x="259" y="481" class="lbl c xs" id="t-ac-bar"></text>
+    <circle class="hub" cx="259" cy="422" r="2.8"/>
+    <text x="259" y="446" class="lbl c xs" id="n-autoclave">Autoclave</text>
+    <text x="259" y="457" class="tv c xs" id="t-ac-rpm">—</text>
+    <text x="259" y="467" class="lbl c xs" id="t-ac-bar"></text>
   </g>
 
   <!-- Rubinetto: unica uscita, calda o fredda non si può sapere -->
   <g id="g-tap">
-    <rect class="box" x="350" y="416" width="56" height="68" rx="10"/>
-    <g transform="translate(378 438) scale(1.3) translate(-384.5 -470)">
+    <rect class="box" x="350" y="402" width="56" height="68" rx="10"/>
+    <g transform="translate(378 424) scale(1.3) translate(-384.5 -470)">
       <path class="ico2" d="M375 464 V474 M375 467 H389 A5 5 0 0 1 394 472 V474 M375 471 H388 A2 2 0 0 1 390 473 V474 M383 467 V462 M380 462 H386"/>
       <path class="drip" d="M392 478 C393.5 480 394 481 394 482 A2 2 0 0 1 390 482 C390 481 390.5 480 392 478 Z"/>
     </g>
-    <text x="378" y="468" class="lbl c xs" id="n-rubinetto">Acqua</text>
-    <text x="378" y="479" class="tv c xs" id="t-tap"></text>
+    <text x="378" y="454" class="lbl c xs" id="n-rubinetto">Acqua</text>
+    <text x="378" y="465" class="tv c xs" id="t-tap"></text>
   </g>
 
   <!-- Pompa sentina (seconda riga): linea dal puffer, nome, stato ed energia dentro -->
   <g id="g-sentina" class="pump clickable" data-key="sentina_potenza|sentina_energia|sentina_stato">
-    <rect class="box" x="12" y="500" width="124" height="44" rx="10"/>
-    <circle class="pring" cx="31" cy="522" r="9"/>
-    <path class="ptri" d="M26.5 525 L31 517 L35.5 525 Z"/>
-    <text x="47" y="514" class="lbl xs" id="n-sentina">Pompa sentina</text>
-    <text x="47" y="527" class="tv xs" id="t-sent">—</text>
-    <text x="47" y="538" class="lbl xs" id="t-sent-kwh"></text>
+    <rect class="box" x="38" y="490" width="124" height="44" rx="10"/>
+    <circle class="pring" cx="57" cy="512" r="9"/>
+    <path class="ptri" d="M52.5 515 L57 507 L61.5 515 Z"/>
+    <text x="73" y="504" class="lbl xs" id="n-sentina">Pompa sentina</text>
+    <text x="73" y="517" class="tv xs" id="t-sent">—</text>
+    <text x="73" y="528" class="lbl xs" id="t-sent-kwh"></text>
   </g>
   </svg>
 </svg>
@@ -687,7 +692,7 @@ const PDC_CSS = `
   .leg    { stroke: var(--c, var(--pdc-idle)); stroke-width: 2.5; stroke-linecap: round; }
   .fan    { transform-box: view-box; transform-origin: 63px 90px; }
   .run .fan { animation: pdc-spin 1s linear infinite; }
-  .imp      { transform-box: view-box; transform-origin: 259px 436px; }
+  .imp      { transform-box: view-box; transform-origin: 259px 422px; }
   .run .imp { animation: pdc-spin var(--spin, .6s) linear infinite; }
   #fill-puffer { fill: var(--c, var(--pdc-idle)); fill-opacity: .18; }
 
@@ -1029,8 +1034,8 @@ class PdcFlowCard extends HTMLElement {
 
   // Contatore: piccolo (r 34, accanto a rete e stop) oppure più grande (r 42) con totale e valvola dentro
   _layoutMeter(merge) {
-    const cx = merge ? 80 : 141;
-    const cy = 450;
+    const cx = merge ? 100 : 141;
+    const cy = 436;
     const r = merge ? 45 : 34;
     const set = (id, attrs) => {
       const el = this._els[id];
@@ -1048,7 +1053,7 @@ class PdcFlowCard extends HTMLElement {
     set('m-vico', { transform: `translate(${cx - 17} ${cy + 27.5})` });
     set('t-mvalve', { x: cx - 9, y: cy + 31 });
     // la linea dell'acqua entra dal bordo sinistro (senza icona della rete) oppure dall'icona della rete
-    const wa = merge ? 'M12 450 H202' : PDC_FLOWS.wa;
+    const wa = merge ? 'M22 436 H202' : PDC_FLOWS.wa;
     this._els['f-wa'].querySelectorAll('path').forEach((p) => p.setAttribute('d', wa));
   }
 
@@ -1280,6 +1285,7 @@ class PdcFlowCard extends HTMLElement {
     const MERGE = c.acqua_separata !== true && (METER || OGGI);
     this._vis(['div-a', 'n-sezione_acqua', 'f-wa', 'f-wb', 'f-wout', 'g-tap', 'n-rubinetto'], WATER);
     this._vis(['g-rete', 'n-rete'], WATER && !MERGE);
+    this._vis(['g-src'], WATER && MERGE);
     this._vis(['g-stop'], WATER && STOP && !MERGE);
     this._vis(['g-meter'], WATER && (METER || OGGI));
     this._vis(['m-valve'], MERGE && STOP);
@@ -1306,16 +1312,19 @@ class PdcFlowCard extends HTMLElement {
     }
     // L'acqua sale ancora di 24 se sotto il pavimento non ci sono le temperature
     const wUp = FTEMPS ? 0 : 24;
-    if (this._wUp !== wUp) {
+    // con il titolo "ACQUA SANITARIA" nascosto le icone dell'acqua salgono di altri 14
+    const wHdr = this._els['n-sezione_acqua'].textContent ? 0 : 14;
+    if (this._wUp !== wUp || this._wHdr !== wHdr) {
       this._els['div-a'].setAttribute('y1', 316 - wUp);
       this._els['div-a'].setAttribute('y2', 316 - wUp);
       this._els['n-sezione_acqua'].setAttribute('y', 340 - wUp);
-      this._els['sv-w'].setAttribute('y', -44 - wUp);
-      this._els['f-whot'].querySelectorAll('path').forEach((pth) => pth.setAttribute('d', `M331 230 V${406 - wUp}`));
+      this._els['sv-w'].setAttribute('y', -44 - wUp - wHdr);
+      this._els['f-whot'].querySelectorAll('path').forEach((pth) => pth.setAttribute('d', `M331 230 V${392 - wUp - wHdr}`));
       this._wUp = wUp;
+      this._wHdr = wHdr;
     }
-    // acqua: una riga (fino a 484) oppure due con la sentina (fino a 544)
-    const hm = !ANY ? 190 : WATER ? (SENT ? 508 : 448) - wUp : FTEMPS ? 318 : 294;
+    // acqua: una riga (fino a 481) oppure due con la sentina (fino a 534)
+    const hm = !ANY ? 190 : WATER ? (SENT ? 498 : 446) - wUp - wHdr : FTEMPS ? 318 : 294;
 
     // ---- Energia ----
     // Velocità dei pallini: più potenza = più veloci (da 3,2 s a 0,3 s per tratto)
@@ -1671,6 +1680,7 @@ class PdcFlowCard extends HTMLElement {
     const durW = outFlow ? Math.max(0.5, 3.2 / (1 + (outLpm || 5) / 5)) : 2;
 
     this._color('g-rete', fixed('rete') || COLD);
+    this._color('g-src', fixed('rete') || COLD);
     const openCol = col('stop', PDC_COL.open);
     this._color('g-stop', stopState === null ? null : stopState ? PDC_COL.closed : openCol);
     this._text('t-stop', stopState === null ? '—' : stopState ? 'chiusa' : 'aperta',

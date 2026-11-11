@@ -23,7 +23,7 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia di
   - pompa di calore con potenza, modalità e un'icona della funzione attiva (riscaldamento, raffrescamento, acqua sanitaria);
   - valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
 - **Acqua sanitaria:**
-  - contatore (L/min, litri di oggi, totale e valvola aperta/chiusa, tutto dentro il contatore), puffer, autoclave, ricircolo dal bollitore e rubinetto;
+  - la linea parte da un piccolo cerchio con la goccia, poi contatore (L/min, litri di oggi, totale e valvola aperta/chiusa, tutto dentro il contatore), puffer, autoclave e rubinetto, centrati sulla stessa linea; la pompa del ricircolo è sotto il bollitore;
   - il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione;
   - sotto, in una seconda riga, la pompa sentina collegata al puffer, con stato ed energia consumata.
 
@@ -217,7 +217,7 @@ A Home Assistant dashboard card that draws an animated view of the home's energy
   - heat pump with power, mode and an icon of the active function (heating, cooling, hot water);
   - 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints.
 - **Domestic water:**
-  - water meter (L/min, today's litres, total and shut-off valve open/closed, all inside the meter), break tank, booster pump, hot-water recirculation and tap;
+  - the line starts from a small circle with a water drop, then water meter (L/min, today's litres, total and shut-off valve open/closed, all inside the meter), break tank, booster pump and tap, centred on the same line; the recirculation pump sits below the hot water tank;
   - the meter fills the break tank; water flows from the tank to the tap only while the booster pump is running;
   - below, on a second row, the sump pump connected to the break tank, with its status and energy used.
 
