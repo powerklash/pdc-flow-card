@@ -16,12 +16,14 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia di
   - Nomi e valori sono dentro le icone.
   - Il traliccio si anima quando la casa preleva dalla rete.
   - Dalla casa escono le utenze elettriche che scegli tu. Se nessuna è accesa, il disegno usa tutta la larghezza.
+  - Quando il fotovoltaico non produce, il pannello diventa più piccolo, gli inverter spariscono e al posto del sole compare la luna (di notte) o una nuvola (di giorno, con il brutto tempo).
 - **Impianto:**
   - pompa di calore con potenza, modalità e un'icona della funzione attiva (riscaldamento, raffrescamento, acqua sanitaria);
   - temperatura esterna, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
 - **Acqua sanitaria:**
   - rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto;
-  - il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione.
+  - il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione;
+  - sotto, in una seconda riga, la pompa sentina collegata al puffer, con stato ed energia consumata.
 
 Ogni componente compare solo se la sua entità è impostata; una sezione senza entità sparisce.
 
@@ -58,6 +60,8 @@ entities:
   fv_potenza: sensor.fotovoltaico_potenza
   inverter_1_potenza: sensor.inverter_1_potenza
   inverter_2_potenza: sensor.inverter_2_potenza
+  fv_previsione: sensor.power_production_now   # previsione (per esempio Forecast.Solar)
+  meteo: weather.casa
   batteria_livello: sensor.batteria_livello
   batteria_potenza: sensor.batteria_potenza
   rete_potenza: sensor.rete_potenza
@@ -83,6 +87,9 @@ entities:
   autoclave_pressione: sensor.autoclave_pressione
   autoclave_comando: select.autoclave_blocco
   ricircolo: switch.ricircolo
+  sentina_potenza: sensor.pompa_sentina_potenza
+  sentina_energia: sensor.pompa_sentina_energia
+  sentina_stato: switch.pompa_sentina
 ```
 
 #### Entità
@@ -91,6 +98,9 @@ entities:
 |---|---|
 | `fv_potenza` | potenza prodotta dal fotovoltaico (se manca, è la somma degli inverter; i valori negativi contano come 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | potenza dei due inverter, disegnati sotto i pannelli |
+| `sole` | sole per alba e tramonto: decide tra luna e nuvola quando il fotovoltaico non produce (vuoto = `sun.sun`) |
+| `fv_previsione` | potenza prevista adesso (per esempio Forecast.Solar): con 0 W previsti compare la luna |
+| `meteo` | entità meteo: con pioggia o neve compaiono gocce o fiocchi sotto la nuvola |
 | `batteria_livello`, `batteria_potenza` | carica della batteria (%) e potenza (positiva = in scarica) |
 | `rete_potenza` | potenza della rete (positiva = prelievo, negativa = immissione) |
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
@@ -110,6 +120,9 @@ entities:
 | `autoclave_velocita`, `autoclave_pressione`, `autoclave_portata`, `autoclave_stato` | dati dell'autoclave |
 | `autoclave_comando` | select (Abilita/Disabilita) o switch per bloccare l'autoclave |
 | `ricircolo` | pompa di ricircolo |
+| `sentina_potenza` | potenza della pompa sentina: è accesa quando assorbe corrente |
+| `sentina_energia` | energia consumata dalla pompa sentina (senza la potenza, la pompa risulta accesa quando questo valore è appena salito) |
+| `sentina_stato` | alimentazione della pompa sentina (off = "spenta", in rosso) |
 
 I setpoint accettano un climate o un water_heater (attributo `temperature`) oppure un sensore.
 
@@ -152,6 +165,7 @@ utenze:
 | `colori` | colore di icone e disegni: nome del tema (`red`, `blue`…), `#hex` o `[r, g, b]` |
 | `temperature` | per ogni temperatura `colora: true` e `min` / `max`: scala da celeste a rosso |
 | `soglia_energia` | potenza in kW sopra cui rete e batteria si animano (predefinito 0: qualsiasi valore) |
+| `fv_compatto` | `false` lascia il fotovoltaico grande anche quando non produce (predefinito: si rimpicciolisce) |
 | `batteria_inverti`, `rete_inverti` | `true` se il sensore usa il segno opposto |
 | `batteria_colora` | `true` colora la batteria secondo la carica: rossa quando è scarica, verde brillante quando è carica |
 | `batteria_min`, `batteria_max` | percentuale a cui la batteria è rossa e a cui è verde (predefinito 0 e 100) |
@@ -192,12 +206,14 @@ A Home Assistant dashboard card that draws an animated view of the home's energy
   - Names and values are inside the icons.
   - The pylon is animated while the house draws power from the grid.
   - Electrical loads you choose branch out of the house. When none is on, the drawing uses the full width.
+  - When the solar panels produce nothing, the panel gets smaller, the inverters are hidden and the sun is replaced by the moon (at night) or a cloud (in the daytime, with bad weather).
 - **Heating system:**
   - heat pump with power, mode and an icon of the active function (heating, cooling, hot water);
   - outdoor temperature, 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints.
 - **Domestic water:**
   - mains, shut-off valve, water meter (L/min and today's litres), break tank, booster pump, hot-water recirculation and tap;
-  - the meter fills the break tank; water flows from the tank to the tap only while the booster pump is running.
+  - the meter fills the break tank; water flows from the tank to the tap only while the booster pump is running;
+  - below, on a second row, the sump pump connected to the break tank, with its status and energy used.
 
 Each component is shown only when its entity is set; a section with no entities disappears.
 
@@ -233,6 +249,9 @@ See the YAML example in the Italian section above: the keys are the same.
 |---|---|
 | `fv_potenza` | solar power (if missing, the sum of the inverters; negative values count as 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | power of the two inverters, drawn below the panels |
+| `sole` | sun entity for sunrise and sunset: picks the moon or the cloud when the panels produce nothing (empty = `sun.sun`) |
+| `fv_previsione` | forecast power right now (for example Forecast.Solar): with 0 W expected the moon is shown |
+| `meteo` | weather entity: rain or snow adds drops or flakes below the cloud |
 | `batteria_livello`, `batteria_potenza` | battery charge (%) and power (positive = discharging) |
 | `rete_potenza` | grid power (positive = import, negative = export) |
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
@@ -252,6 +271,9 @@ See the YAML example in the Italian section above: the keys are the same.
 | `autoclave_velocita`, `autoclave_pressione`, `autoclave_portata`, `autoclave_stato` | booster pump speed, pressure, flow and status |
 | `autoclave_comando` | select (Abilita/Disabilita = enable/disable) or switch to lock the booster pump |
 | `ricircolo` | recirculation pump |
+| `sentina_potenza` | sump pump power: the pump is "on" while it draws current |
+| `sentina_energia` | sump pump energy (without the power sensor, the pump counts as on right after this value rises) |
+| `sentina_stato` | sump pump supply (off = "spenta", switched off, in red) |
 
 Setpoints accept a climate or water_heater entity (`temperature` attribute) or a sensor.
 
@@ -285,6 +307,7 @@ In the visual editor use **Aggiungi utenza elettrica** (add electrical load). Ke
 | `colori` | icon and drawing colours: theme colour name (`red`, `blue`…), `#hex` or `[r, g, b]` |
 | `temperature` | per temperature `colora: true` and `min` / `max`: light blue to red scale |
 | `soglia_energia` | kW above which grid and battery are animated (default 0: any value) |
+| `fv_compatto` | `false` keeps the solar panel full size when it produces nothing (default: it shrinks) |
 | `batteria_inverti`, `rete_inverti` | `true` if the sensor uses the opposite sign |
 | `batteria_colora` | `true` colours the battery by charge: red when empty, bright green when full |
 | `batteria_min`, `batteria_max` | charge (%) at which the battery is red and green (default 0 and 100) |
