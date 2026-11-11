@@ -13,7 +13,7 @@
  *   entities:            # ogni componente compare solo se la sua entità è impostata
  *     (energia) fv_potenza, inverter_1_potenza, inverter_2_potenza, batteria_livello, batteria_potenza (+ = in scarica),
  *     rete_potenza (+ = prelievo), rete_stato (on = rete collegata), casa_potenza,
- *     temperatura_esterna (in alto a sinistra della parte energia; senza energia, nel titolo dell'impianto)
+ *     temperatura_esterna (piccola, a sinistra del tetto della casa; senza la casa in alto a sinistra; senza energia nel titolo dell'impianto)
  *   utenze:              # facoltativo: utenze elettriche che escono dalla casa
  *     - entity: sensor.lavatrice_potenza
  *       nome: Lavatrice
@@ -48,7 +48,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.27.0';
+const PDC_VERSION = '0.28.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -312,7 +312,7 @@ const PDC_FLOWS = {
   // acqua (riga principale a 450; sotto, la seconda riga con la pompa sentina)
   wa: 'M54 436 H202',
   wb: 'M202 436 H331',
-  wout: 'M331 436 H350',
+  wout: 'M331 436 H348',
   ws: 'M202 478 V504 Q202 512 194 512 H162',
   whot: 'M331 230 V392',
 };
@@ -327,9 +327,10 @@ const PDC_EH = 292;
 const PDC_E_FULL = { J: 134, Y: 180, B: 249, BT: 214, PB: 74, dyB: 0, EH: PDC_EH };
 const PDC_E_COMPACT = { J: 66, Y: 108, B: 177, BT: 142, PB: 61.5, dyB: -72, EH: 220 };
 // Utenze: cerchio con icona e valore dentro, nome a destra
-const PDC_U = { left: 298, w: 116, h: 34, icon: 315, text: 330, row: 40, bus: 180 };
+// le pillole finiscono a 404, come il bollitore
+const PDC_U = { left: 288, w: 116, h: 34, icon: 305, text: 320, row: 40, bus: 180 };
 // Posizioni (centri) di rete, fotovoltaico/batteria e casa: con le utenze a destra, oppure su tutta la larghezza
-const PDC_E_LAYOUT = { utenze: { gx: 50, sx: 150, hx: 250 }, pieno: { gx: 56, sx: 210, hx: 362 } };
+const PDC_E_LAYOUT = { utenze: { gx: 47, sx: 144, hx: 240 }, pieno: { gx: 47, sx: 210, hx: 374 } };
 // Linee dell'energia: ogni punto è collegato direttamente agli altri
 const PDC_E_FLOWS = ['e_fv', 'e_inv1a', 'e_inv1b', 'e_inv2a', 'e_inv2b', 'e_sg', 'e_sh', 'e_sb', 'e_gh', 'e_gb', 'e_bh'];
 const pdcFlowE = (id) => `<g class="flow thin" id="f-${id}"><path class="pipe" d=""/><path class="dots" d=""/></g>`;
@@ -413,7 +414,7 @@ const PDC_SVG_ENERGY = `
   <!-- Rete: traliccio senza riquadro; cavi e scintilla animati solo quando la casa preleva -->
   <g id="g-grid" class="clickable" data-key="rete_potenza|rete_stato">
     <rect class="hit" x="-46" y="-40" width="74" height="80"/>
-    <path class="gwire" d="M-46 -16 Q-34 -10 -22 -22 M-46 -6 Q-32 -1 -18 -12"/>
+    <path class="gwire" d="M-40 -16 Q-31 -11 -22 -22 M-40 -6 Q-29 -2 -18 -12"/>
     <path class="tower" d="M0 -34 L-25 36 M0 -34 L25 36 M-22 -26 H22 M-18 -16 H18 M-6.4 -16 L11.8 -2 M6.4 -16 L-11.8 -2 M-29 36 H29"/>
     <path class="ins" d="M-22 -26 v4 M22 -26 v4 M-18 -16 v4 M18 -16 v4"/>
     <path class="gspark" d="M29 -42 L24 -34 H28 L26 -27 L32 -36 H28 Z"/>
@@ -429,6 +430,14 @@ const PDC_SVG_ENERGY = `
     <path class="ico2" d="M17 -17.3 V-28 H22 V-12.9 M-24 -6 V28 H24 V-6"/>
     <text x="0" y="7" class="lbl c xs" id="n-casa">Casa</text>
     <text x="0" y="22" class="val c" id="t-casa">—</text>
+    <!-- Temperatura esterna: piccola icona a sinistra del tetto, sopra le linee che arrivano alla casa -->
+    <g id="g-ext-h" class="clickable hidden" data-key="temperatura_esterna">
+      <g transform="translate(-44.6 -45) scale(0.65)">
+        <path class="ico" d="M21.5 22.5 V11.5 a2.5 2.5 0 0 1 5 0 V22.5 a4.5 4.5 0 1 1 -5 0 Z"/>
+        <circle class="ico-fill" cx="24" cy="26.5" r="2"/>
+      </g>
+      <text x="-34" y="-28" class="tv e" id="t-ext-h">—</text>
+    </g>
   </g>
 
   <!-- Batteria (sotto): carica e potenza dentro -->
@@ -453,7 +462,7 @@ const PDC_SVG = `
 ${PDC_SVG_ENERGY}
 <svg id="sv-m" x="0" y="0" width="420" height="540" viewBox="0 0 420 540">
   <defs>
-    <clipPath id="cp-boiler"><rect x="258" y="50" width="146" height="180" rx="24"/></clipPath>
+    <clipPath id="cp-boiler"><rect x="258" y="36" width="146" height="194" rx="24"/></clipPath>
     <clipPath id="cp-accu"><rect x="156" y="196" width="88" height="80" rx="18"/></clipPath>
     <clipPath id="cp-puffer"><rect x="182" y="394" width="40" height="84" rx="16"/></clipPath>
   </defs>
@@ -471,9 +480,9 @@ ${PDC_SVG_ENERGY}
 
   <!-- Bollitore -->
   <g id="g-boiler" class="clickable" data-key="acs_temperatura">
-    <rect class="tank" x="258" y="50" width="146" height="180" rx="24"/>
+    <rect class="tank" x="258" y="36" width="146" height="194" rx="24"/>
     <rect id="fill-boiler" class="fill" clip-path="url(#cp-boiler)" x="258" y="230" width="146" height="0"/>
-    <rect class="tank-o" x="258" y="50" width="146" height="180" rx="24"/>
+    <rect class="tank-o" x="258" y="36" width="146" height="194" rx="24"/>
     <text x="331" y="172" class="big c" id="t-boiler">—</text>
     <text x="331" y="189" class="lbl c sm" id="n-bollitore">Bollitore</text>
   </g>
@@ -581,8 +590,8 @@ ${PDC_SVG_ENERGY}
 
   <!-- Inizio della linea (contatore unico): piccolo cerchio con la goccia -->
   <g id="g-src">
-    <circle class="box" cx="22" cy="436" r="11"/>
-    <path class="drop" d="M22 429.5 C24.8 432.8 26.5 435.2 26.5 437.9 A4.5 4.5 0 0 1 17.5 437.9 C17.5 435.2 19.2 432.8 22 429.5 Z"/>
+    <circle class="box" cx="29" cy="436" r="11"/>
+    <path class="drop" d="M29 429.5 C31.8 432.8 33.5 435.2 33.5 437.9 A4.5 4.5 0 0 1 24.5 437.9 C24.5 435.2 26.2 432.8 29 429.5 Z"/>
   </g>
 
   <!-- Rete -->
@@ -641,13 +650,13 @@ ${PDC_SVG_ENERGY}
 
   <!-- Rubinetto: unica uscita, calda o fredda non si può sapere -->
   <g id="g-tap">
-    <rect class="box" x="350" y="402" width="56" height="68" rx="10"/>
-    <g transform="translate(378 424) scale(1.3) translate(-384.5 -470)">
+    <rect class="box" x="348" y="402" width="56" height="68" rx="10"/>
+    <g transform="translate(376 424) scale(1.3) translate(-384.5 -470)">
       <path class="ico2" d="M375 464 V474 M375 467 H389 A5 5 0 0 1 394 472 V474 M375 471 H388 A2 2 0 0 1 390 473 V474 M383 467 V462 M380 462 H386"/>
       <path class="drip" d="M392 478 C393.5 480 394 481 394 482 A2 2 0 0 1 390 482 C390 481 390.5 480 392 478 Z"/>
     </g>
-    <text x="378" y="454" class="lbl c xs" id="n-rubinetto">Acqua</text>
-    <text x="378" y="465" class="tv c xs" id="t-tap"></text>
+    <text x="376" y="454" class="lbl c xs" id="n-rubinetto">Acqua</text>
+    <text x="376" y="465" class="tv c xs" id="t-tap"></text>
   </g>
 
   <!-- Pompa sentina (seconda riga): linea dal puffer, nome, stato ed energia dentro -->
@@ -1053,7 +1062,7 @@ class PdcFlowCard extends HTMLElement {
     set('m-vico', { transform: `translate(${cx - 17} ${cy + 27.5})` });
     set('t-mvalve', { x: cx - 9, y: cy + 31 });
     // la linea dell'acqua entra dal bordo sinistro (senza icona della rete) oppure dall'icona della rete
-    const wa = merge ? 'M22 436 H202' : PDC_FLOWS.wa;
+    const wa = merge ? 'M29 436 H202' : PDC_FLOWS.wa;
     this._els['f-wa'].querySelectorAll('path').forEach((p) => p.setAttribute('d', wa));
   }
 
@@ -1262,7 +1271,10 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['sv-m'], MAIN);
     this._vis(['div-e'], EN && MAIN);
     this._vis(['n-sezione_impianto'], ANY);
-    this._vis(['g-ext'], has('temperatura_esterna'));
+    const EXT = has('temperatura_esterna');
+    const EXT_H = EXT && EN && (HOME || this._utenze.length > 0);
+    this._vis(['g-ext'], EXT && !EXT_H);
+    this._vis(['g-ext-h'], EXT_H);
     this._placeExt(EN);
     this._vis(['g-pdc', 't-pdc-pow', 't-pdc-mode', 'n-pompa_di_calore'], PDC);
     this._vis(['f-s1', 'f-r2b'], showS1);
@@ -1608,6 +1620,8 @@ class PdcFlowCard extends HTMLElement {
     const extTemp = tc('esterno', tExt);
     this._color('g-ext', fixed('esterno') || (colora('esterno') ? extTemp : null));
     this._text('t-ext', tExt === null ? '—' : f1(tExt) + ' °C', colora('esterno') ? extTemp : '');
+    this._color('g-ext-h', fixed('esterno') || (colora('esterno') ? extTemp : null));
+    this._text('t-ext-h', tExt === null ? '—' : f1(tExt) + ' °C', colora('esterno') ? extTemp : '');
     paint('n-esterno', colora('esterno') ? extTemp : null);
 
     this._color('g-pdc', pdcIcon);
@@ -1640,7 +1654,7 @@ class PdcFlowCard extends HTMLElement {
     const boilTxt = colora('bollitore') ? tc('bollitore', tAcs) : null;
     this._text('t-boiler', fT(tAcs), boilTxt || '');
     paint('n-bollitore', boilTxt);
-    this._fill('fill-boiler', tAcs, 50, 180, cAcs);
+    this._fill('fill-boiler', tAcs, 36, 194, cAcs);
     this._color('g-accu', cAccu);
     const accuTxt = colora('accumulo') ? tc('accumulo', tAccu) : null;
     this._text('t-accu', fT(tAccu), accuTxt || '');
@@ -2119,6 +2133,7 @@ class PdcFlowCardEditor extends HTMLElement {
         if (/^u\d+_entity$/.test(sch.name)) return 'Potenza (W o kW) oppure un altro sensore: stato, percentuale…';
         if (sch.name === 'autoclave_comando') return 'Un select con le opzioni Abilita / Disabilita, oppure uno switch (off = bloccata)';
         if (sch.name === 'sole') return 'Vuoto = sun.sun';
+        if (sch.name === 'temperatura_esterna') return 'Compare piccola a sinistra del tetto della casa (senza la parte energia: nel titolo dell’impianto)';
         if (sch.name === 'fv_previsione') return 'Per esempio Forecast.Solar: con 0 W previsti è notte (luna), altrimenti brutto tempo (nuvola)';
         if (sch.name === 'sentina_energia') return 'Senza il sensore di potenza, la pompa risulta accesa quando questo valore è appena salito';
         return undefined;

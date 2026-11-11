@@ -16,7 +16,8 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia di
   - Nomi e valori sono dentro le icone.
   - Il traliccio si anima quando la casa preleva dalla rete.
   - Dalla casa escono le utenze elettriche che scegli tu. Se nessuna è accesa, il disegno usa tutta la larghezza.
-  - In alto a sinistra c'è la temperatura esterna.
+  - La temperatura esterna è piccola, a sinistra del tetto della casa, sopra le linee che arrivano alla casa.
+  - Rete, pompa di calore, pavimento e inizio dell'acqua sono allineati a sinistra; casa, bollitore, utenze e rubinetto a destra.
   - Ai lati dei pannelli ci sono l'ora dell'alba (a sinistra) e del tramonto (a destra), presi dal sole di Home Assistant.
   - Quando il fotovoltaico non produce, il pannello diventa più piccolo, gli inverter spariscono e al posto del sole compare la luna (di notte) o una nuvola (di giorno, con il brutto tempo).
 - **Impianto:**
@@ -107,7 +108,7 @@ entities:
 | `rete_potenza` | potenza della rete (positiva = prelievo, negativa = immissione) |
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
-| `temperatura_esterna` | temperatura esterna, in alto a sinistra della parte energia (senza la parte energia, nel titolo dell'impianto) |
+| `temperatura_esterna` | temperatura esterna, piccola a sinistra del tetto della casa (senza la casa in alto a sinistra; senza la parte energia nel titolo dell'impianto) |
 | `pdc_potenza` | potenza della pompa di calore (anche una lista di sensori, che vengono sommati) |
 | `riscaldamento`, `raffrescamento` | modalità attiva della pompa di calore |
 | `acs_potenza` oppure `acs_attiva` | potenza del ciclo acqua calda, oppure un'entità on/off |
@@ -210,7 +211,8 @@ A Home Assistant dashboard card that draws an animated view of the home's energy
   - Names and values are inside the icons.
   - The pylon is animated while the house draws power from the grid.
   - Electrical loads you choose branch out of the house. When none is on, the drawing uses the full width.
-  - The outdoor temperature is in the top-left corner.
+  - The outdoor temperature is small, to the left of the house roof, above the lines reaching the house.
+  - Grid, heat pump, underfloor heating and the start of the water line are aligned on the left; house, hot water tank, loads and tap on the right.
   - Next to the panels are the sunrise time (left) and sunset time (right), taken from Home Assistant's sun entity.
   - When the solar panels produce nothing, the panel gets smaller, the inverters are hidden and the sun is replaced by the moon (at night) or a cloud (in the daytime, with bad weather).
 - **Heating system:**
@@ -262,7 +264,7 @@ See the YAML example in the Italian section above: the keys are the same.
 | `rete_potenza` | grid power (positive = import, negative = export) |
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
 | `casa_potenza` | house consumption (calculated if missing) |
-| `temperatura_esterna` | outdoor temperature, top-left of the energy section (without the energy section, in the heating system title) |
+| `temperatura_esterna` | outdoor temperature, small, left of the house roof (without the house, top-left; without the energy section, in the heating system title) |
 | `pdc_potenza` | heat pump power (also a list of sensors, which are added up) |
 | `riscaldamento`, `raffrescamento` | heating / cooling mode active |
 | `acs_potenza` or `acs_attiva` | hot-water cycle power, or an on/off entity |
