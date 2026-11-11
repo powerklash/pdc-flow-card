@@ -39,10 +39,10 @@
  *   demo: true                 # facoltativo: dati di esempio finché non si imposta un'entità
  *   batteria_inverti / rete_inverti: true   # facoltativo: segno opposto della potenza
  *   batteria_colora: true      # facoltativo: batteria da rosso (scarica) a verde (carica); batteria_min / batteria_max in %
- *   soglia_energia: 0.1        # facoltativo: kW sopra cui il flusso elettrico si anima
+ *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.19.0';
+const PDC_VERSION = '0.21.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -301,7 +301,7 @@ const PDC_FLOWS = {
 };
 
 // Sezione energia: altezza minima e posizione delle utenze
-const PDC_EH = 296;
+const PDC_EH = 300;
 // Utenze: cerchio con icona e valore dentro, nome a destra
 const PDC_U = { icon: 318, r: 19, text: 345, row: 46, bus: 180 };
 // Posizioni (centri) di rete, fotovoltaico/batteria e casa: con le utenze a destra, oppure su tutta la larghezza
@@ -319,10 +319,10 @@ function pdcEnergyPaths({ gx, sx, hx }) {
     e_inv2b: `M${sx + 30} 122 C${sx + 30} 130 ${sx + 12} 134 ${sx} 134`,
     e_sg: `M${sx - 6} 134 C${sx - 6} 162 ${gx + 56} 168 ${gx + 24} 168`,
     e_sh: `M${sx + 6} 134 C${sx + 6} 162 ${hx - 58} 168 ${hx - 26} 168`,
-    e_sb: `M${sx} 134 V214`,
+    e_sb: `M${sx} 134 V212`,
     e_gh: `M${gx + 24} 180 H${hx - 26}`,
-    e_gb: `M${gx + 24} 192 C${gx + 64} 192 ${bx - 46} 249 ${bx - 24} 249`,
-    e_bh: `M${bx + 24} 249 C${bx + 46} 249 ${hx - 66} 192 ${hx - 26} 192`,
+    e_gb: `M${gx + 24} 192 C${gx + 64} 192 ${bx - 47} 250 ${bx - 25} 250`,
+    e_bh: `M${bx + 25} 250 C${bx + 47} 250 ${hx - 66} 192 ${hx - 26} 192`,
   };
 }
 
@@ -335,7 +335,7 @@ const PDC_IMP = 'M236 470 C233 466 234 461 238 459.5 C240.5 463.5 239.5 467.5 23
 const PDC_SVG_ENERGY = `
 <svg id="sv-e" x="0" y="0" width="420" height="${PDC_EH}" viewBox="0 0 420 ${PDC_EH}">
   <defs>
-    <clipPath id="cp-batt"><rect x="-24" y="218" width="48" height="62" rx="10"/></clipPath>
+    <clipPath id="cp-batt"><rect x="-25" y="212" width="50" height="76" rx="7"/></clipPath>
   </defs>
   <text x="18" y="24" class="sec" id="n-sezione_energia">ENERGIA</text>
 
@@ -390,15 +390,16 @@ const PDC_SVG_ENERGY = `
 
   <!-- Batteria (sotto): carica e potenza dentro -->
   <g id="g-batt" class="clickable" data-key="batteria_livello|batteria_potenza">
-    <rect class="bterm" x="-9" y="214" width="18" height="4" rx="1.5"/>
-    <rect class="tank" x="-24" y="218" width="48" height="62" rx="10"/>
-    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="-24" y="280" width="48" height="0"/>
-    <rect class="tank-o" x="-24" y="218" width="48" height="62" rx="10"/>
-    <path class="bbolt" id="b-bolt" d="M2 222 L-4 231 H0 L-2 238 L4 229 H0 Z"/>
-    <text x="0" y="255" class="mval c halo" id="t-soc"></text>
-    <text x="0" y="270" class="tv c xs halo" id="t-batt">—</text>
-    <text x="-32" y="262" class="lbl e" id="n-batteria">Batteria</text>
-    <text x="-32" y="275" class="lbl e xs" id="t-batt-dir"></text>
+    <!-- batteria domestica a lastra: niente simboli, una striscia luminosa sul lato -->
+    <rect class="tank" x="-25" y="212" width="50" height="76" rx="7"/>
+    <rect id="fill-batt" class="fill" clip-path="url(#cp-batt)" x="-25" y="288" width="50" height="0"/>
+    <rect class="bbevel" x="-21" y="216" width="42" height="68" rx="4.5"/>
+    <rect class="tank-o" x="-25" y="212" width="50" height="76" rx="7"/>
+    <rect class="bled" id="b-led" x="17.5" y="224" width="2.6" height="52" rx="1.3"/>
+    <text x="-2" y="252" class="mval c halo" id="t-soc"></text>
+    <text x="-2" y="268" class="tv c xs halo" id="t-batt">—</text>
+    <text x="-33" y="266" class="lbl e" id="n-batteria">Batteria</text>
+    <text x="-33" y="279" class="lbl e xs" id="t-batt-dir"></text>
   </g>
 
   <g id="g-utenze"></g>
@@ -418,7 +419,7 @@ ${PDC_SVG_ENERGY}
 
   <!-- ===== SEZIONE IMPIANTO ===== -->
   <text x="18" y="24" class="sec" id="n-sezione_impianto">IMPIANTO</text>
-  <g id="g-ext" class="clickable" data-key="temperatura_esterna" transform="translate(296 0)">
+  <g id="g-ext" class="clickable" data-key="temperatura_esterna" transform="translate(140 -3)">
     <path class="ico" d="M21.5 22.5 V11.5 a2.5 2.5 0 0 1 5 0 V22.5 a4.5 4.5 0 1 1 -5 0 Z"/>
     <circle class="ico-fill" cx="24" cy="26.5" r="2"/>
     <text x="34" y="27" class="val"><tspan id="t-ext">—</tspan><tspan class="lbl" dx="5" id="n-esterno">esterno</tspan></text>
@@ -476,7 +477,7 @@ ${PDC_SVG_ENERGY}
 
   <!-- Pompa di calore -->
   <g id="g-pdc" class="clickable" data-key="pdc_potenza">
-    <rect class="box" x="18" y="50" width="90" height="80" rx="12"/>
+    <rect class="box" x="18" y="36" width="90" height="124" rx="12"/>
     <circle class="ring" cx="63" cy="90" r="28"/>
     <g class="fan">
       <path class="blade" d="${PDC_BLADE}"/>
@@ -484,12 +485,16 @@ ${PDC_SVG_ENERGY}
       <path class="blade" d="${PDC_BLADE}" transform="rotate(240 63 90)"/>
     </g>
     <circle class="hub" cx="63" cy="90" r="4"/>
-    <line class="leg" x1="30" y1="131" x2="30" y2="137"/>
-    <line class="leg" x1="96" y1="131" x2="96" y2="137"/>
+    <!-- icona della funzione attiva: riscaldamento, raffrescamento, acqua sanitaria -->
+    <path class="pmi" id="pm-heat" transform="translate(98 64)" d="M0.6 -7 C1.2 -4 4.4 -2.4 4.4 1.8 A4.4 4.6 0 0 1 -4.4 1.8 C-4.4 -1 -2.6 -2.2 -2.1 -4.4 C-1.3 -2.7 -0.6 -2.2 0 -2 C0.7 -3.8 0.4 -5.4 0.6 -7 Z"/>
+    <path class="pms" id="pm-cool" transform="translate(98 64)" d="M0 -7 V7 M-6.1 -3.5 L6.1 3.5 M-6.1 3.5 L6.1 -3.5 M-2 -6 L0 -4 L2 -6 M-2 6 L0 4 L2 6 M-6.2 -1.2 L-3.5 -2 L-4.2 -4.6 M6.2 1.2 L3.5 2 L4.2 4.6 M-6.2 1.2 L-3.5 2 L-4.2 4.6 M6.2 -1.2 L3.5 -2 L4.2 -4.6"/>
+    <path class="pmi" id="pm-acs" transform="translate(98 64)" d="M0 -7 C2.6 -3.4 4.6 -0.8 4.6 2.2 A4.6 4.6 0 0 1 -4.6 2.2 C-4.6 -0.8 -2.6 -3.4 0 -7 Z"/>
+    <line class="leg" x1="30" y1="161" x2="30" y2="167"/>
+    <line class="leg" x1="96" y1="161" x2="96" y2="167"/>
+    <text x="63" y="51" class="lbl c sm" id="n-pompa_di_calore">Pompa di calore</text>
+    <text x="63" y="138" class="val c" id="t-pdc-pow">—</text>
+    <text x="63" y="152" class="lbl c xs" id="t-pdc-mode">—</text>
   </g>
-  <text x="63" y="44" class="lbl c" id="n-pompa_di_calore">Pompa di calore</text>
-  <text x="63" y="156" class="val c" id="t-pdc-pow">—</text>
-  <text x="63" y="171" class="lbl c" id="t-pdc-mode">—</text>
 
   <!-- Valvola 3 vie -->
   <g id="g-v3v" class="clickable" data-key="acs_potenza|acs_attiva">
@@ -674,17 +679,23 @@ const PDC_CSS = `
   .roof  { fill: var(--c, var(--pdc-idle)); fill-opacity: .28; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linejoin: round; }
   .win   { fill: var(--c, var(--pdc-idle)); fill-opacity: 0; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.2; transition: fill-opacity .5s; }
   .run .win { fill-opacity: .7; }
-  .bbolt { fill: var(--c, var(--pdc-idle)); fill-opacity: .9; opacity: 0; transition: opacity .4s; }
-  .bbolt.on { opacity: 1; }
+  .pmi  { fill: var(--c, var(--pdc-idle)); }
+  .pms  { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  .pmi.dim, .pms.dim { opacity: .4; }
+  .bled { fill: var(--c, var(--pdc-idle)); opacity: .35; transition: opacity .5s; }
+  .bled.on { opacity: 1; }
+  .bbevel { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1; opacity: .25; }
+  .flow.thin { transition: opacity .4s; }
+  .flow.thin:not(.on) { opacity: 0; }
   .uico { fill: var(--c, var(--pdc-idle)); }
 
   .flow .pipe { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 2.2; stroke-linejoin: round; opacity: .3; transition: opacity .5s, stroke .5s; }
   .flow.on .pipe { opacity: .9; }
-  .flow .dots { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0.1 26; opacity: 0; transition: opacity .4s; }
+  .flow .dots { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0.1 52; opacity: 0; transition: opacity .4s; }
   .flow.on .dots { opacity: 1; animation: pdc-flow var(--dur, 1.6s) linear infinite; }
   .flow.rev .dots { animation-direction: reverse; }
 
-  @keyframes pdc-flow  { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -26.1; } }
+  @keyframes pdc-flow  { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -52.1; } }
   @keyframes pdc-spin  { to { transform: rotate(360deg); } }
   @keyframes pdc-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 4; } }
 
@@ -696,7 +707,7 @@ const PDC_CSS = `
 class PdcFlowCard extends HTMLElement {
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('pdc-flow-card: configurazione non valida');
-    this._config = { soglia_pdc: 0.1, soglia_acs: 0.1, soglia_energia: 0.1, ...config, entities: { ...(config.entities || {}) } };
+    this._config = { soglia_pdc: 0.1, soglia_acs: 0.1, soglia_energia: 0, ...config, entities: { ...(config.entities || {}) } };
     // Esempio: solo finché non c'è nessuna entità impostata
     this._demo = config.demo === true && !PDC_ENTITY_KEYS.some((k) => this._config.entities[k]) && !pdcUtenze(config).length;
     if (this._demo) {
@@ -943,7 +954,8 @@ class PdcFlowCard extends HTMLElement {
     g.classList.toggle('rev', !!rev);
     if (color) g.style.setProperty('--c', color);
     else g.style.removeProperty('--c');
-    const d = (Math.round(dur * 10) / 10).toFixed(1) + 's';
+    // pallini distanziati il doppio: il giro dura il doppio, così la velocità resta la stessa
+    const d = (Math.round(dur * 20) / 10).toFixed(1) + 's';
     if (g._dur !== d) {
       g.style.setProperty('--dur', d);
       g._dur = d;
@@ -1064,6 +1076,10 @@ class PdcFlowCard extends HTMLElement {
     }
     const houseLpm = Math.max(meterFlow ? lpm : 0, acLpm || 0);
     const flowing = houseLpm > 0.05 || acRun;
+    // Con l'autoclave: il contatore riempie il puffer; dal puffer al rubinetto solo quando l'autoclave è in funzione
+    const AUTO = has('autoclave_velocita') || has('autoclave_stato') || has('autoclave_portata');
+    const outFlow = AUTO ? !!acRun || (acLpm || 0) > 0.05 : flowing;
+    const outLpm = AUTO ? acLpm || (acRun ? 5 : 0) : houseLpm;
 
     // ---- Colori (personalizzati o automatici) ----
     const COLD = col('acqua_fredda', PDC_COL.cold);
@@ -1145,11 +1161,14 @@ class PdcFlowCard extends HTMLElement {
 
     // ---- Energia ----
     // Velocità dei pallini: più potenza = più veloci (da 3,2 s a 0,3 s per tratto)
-    const durE = (kw) => Math.min(3.2, Math.max(0.3, 3.2 / (1 + 1.1 * Math.abs(kw || 0))));
+    // pochi watt = lentissimo (6 s per tratto), 1 kW ≈ 1,6 s, 5 kW ≈ 0,6 s
+    const durE = (kw) => Math.min(6, Math.max(0.3, 1.6 * Math.pow(Math.max(Math.abs(kw || 0), 0.001), -0.6)));
     const sE = Number(c.soglia_energia) || 0;
-    const pInv1 = this._kw('inverter_1_potenza');
-    const pInv2 = this._kw('inverter_2_potenza');
-    let pFv = this._kw('fv_potenza');
+    // la produzione non è mai negativa: di notte alcuni sistemi segnano pochi watt sotto zero
+    const prod = (v) => (v === null ? null : Math.max(0, v));
+    const pInv1 = prod(this._kw('inverter_1_potenza'));
+    const pInv2 = prod(this._kw('inverter_2_potenza'));
+    let pFv = prod(this._kw('fv_potenza'));
     if (pFv === null && (pInv1 !== null || pInv2 !== null)) pFv = (pInv1 || 0) + (pInv2 || 0);
     let pBat = this._kw('batteria_potenza');
     if (pBat !== null && c.batteria_inverti) pBat = -pBat;
@@ -1158,9 +1177,9 @@ class PdcFlowCard extends HTMLElement {
     const soc = this._num('batteria_livello');
     const fmtP = (v) => (v === null ? '—' : Math.abs(v) < 1 ? f0(Math.abs(v) * 1000) + ' W' : f1(Math.abs(v)) + ' kW');
     // la soglia serve per rete e batteria, che oscillano; produzione e consumi si vedono da 10 W
-    const fvOn = pFv !== null && pFv > 0.01;
-    const inv1On = pInv1 !== null && pInv1 > 0.01;
-    const inv2On = pInv2 !== null && pInv2 > 0.01;
+    const fvOn = pFv !== null && pFv > 0.0005;
+    const inv1On = pInv1 !== null && pInv1 > 0.0005;
+    const inv2On = pInv2 !== null && pInv2 > 0.0005;
     const batDis = pBat !== null && pBat > sE;
     const batChg = pBat !== null && pBat < -sE;
     const gridIn = pGrid !== null && pGrid > sE;
@@ -1168,7 +1187,7 @@ class PdcFlowCard extends HTMLElement {
     // Casa: dal sensore, oppure dal bilancio di fotovoltaico, batteria e rete
     let pHome = this._kw('casa_potenza');
     if (pHome === null && (pFv !== null || pBat !== null || pGrid !== null)) pHome = Math.max(0, (pFv || 0) + (pBat || 0) + (pGrid || 0));
-    const homeOn = pHome !== null && pHome > 0.01;
+    const homeOn = pHome !== null && pHome > 0.0005;
     const gridState = this._on('rete_stato'); // true = rete collegata
     const gridDown = gridState === false;
     const cFv = col('fotovoltaico', PDC_COL.solar);
@@ -1211,7 +1230,7 @@ class PdcFlowCard extends HTMLElement {
       if (['W', 'kW', 'MW'].includes(unit) && !isNaN(raw)) {
         kw = unit === 'W' ? raw / 1000 : unit === 'MW' ? raw * 1000 : raw;
         txt = fmtP(kw);
-        on = lim !== null ? raw > lim : kw > 0.01;
+        on = lim !== null ? raw > lim : kw > 0.0005;
       } else if (st && !isNaN(raw)) {
         txt = (Number.isInteger(raw) ? f0(raw) : f1(raw)) + (unit ? (['%', '°', '°C'].includes(unit) ? '' : ' ') + (unit === '°C' ? '°' : unit) : '');
         on = raw > (lim !== null ? lim : 0);
@@ -1258,7 +1277,7 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['f-e_fv'], FV && !INV1 && !INV2);
     this._vis(['g-inv1', 'f-e_inv1a', 'f-e_inv1b'], INV1);
     this._vis(['g-inv2', 'f-e_inv2a', 'f-e_inv2b'], INV2);
-    this._vis(['jn-s'], FV && (INV1 || INV2));
+    this._vis(['jn-s'], FV && (INV1 || INV2) && fvOn);
     this._vis(['g-batt'], BATT);
     this._vis(['g-grid'], GRID || has('rete_stato'));
     this._vis(['g-casa'], HOUSE);
@@ -1285,21 +1304,21 @@ class PdcFlowCard extends HTMLElement {
     this._color('jn-s', fvOn ? cFv : null);
 
     // Linee dirette tra i punti: colorate e animate solo quando ci passa energia, grigie da ferme
-    const link = (id, kw, color, rev = false) => this._flow(id, kw > 0.01, kw > 0.01 ? color : null, durE(kw), rev);
+    const link = (id, kw, color, rev = false) => this._flow(id, kw > 0.0005, kw > 0.0005 ? color : null, durE(kw), rev);
     link('e_sg', fSG, cGridOut);
     link('e_sh', fSH, cFv);
     link('e_sb', fSB, cFv);
     link('e_gh', fGH, cGridIn);
-    if (fBG > 0.01) link('e_gb', fBG, cGridOut, true);
+    if (fBG > 0.0005) link('e_gb', fBG, cGridOut, true);
     else link('e_gb', fGB, cGridIn);
     link('e_bh', fBH, cBat);
 
     // Batteria
     this._color('g-batt', cBat);
-    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 218, 62, cBat);
+    this._fill('fill-batt', soc === null ? null : 10 + (soc / 100) * 50, 212, 76, cBat);
     this._text('t-soc', soc === null ? '' : f0(soc) + '%');
     paint('n-batteria', cSoc);
-    this._els['b-bolt'].classList.toggle('on', batChg);
+    this._els['b-led'].classList.toggle('on', batChg || batDis);
     this._text('t-batt', pBat === null ? '' : fmtP(pBat), batDis || batChg || cSoc ? cBatTxt : '');
     this._text('t-batt-dir', batChg ? 'in carica' : batDis ? 'in scarica' : '');
 
@@ -1376,6 +1395,11 @@ class PdcFlowCard extends HTMLElement {
     this._els['g-pdc'].classList.toggle('run', running);
     this._text('t-pdc-pow', pKw === null ? '—' : pKw < 1 ? f0(pKw * 1000) + ' W' : f1(pKw) + ' kW');
     this._text('t-pdc-mode', mode, pdcColor || '');
+    const pm = running ? (acs ? 'acs' : cool ? 'cool' : 'heat') : heat ? 'heat' : cool ? 'cool' : null;
+    for (const k of ['heat', 'cool', 'acs']) {
+      this._show('pm-' + k, PDC && pm === k);
+      this._els['pm-' + k].classList.toggle('dim', !running);
+    }
 
     // Valvola 3 vie: con un solo ramo (solo bollitore o solo accumulo) il flusso va lì
     const toAcs = BOIL && (ACCU ? acs : true);
@@ -1434,7 +1458,7 @@ class PdcFlowCard extends HTMLElement {
 
     // ---- Acqua sanitaria ----
     const durM = meterFlow ? Math.max(0.5, 3.2 / (1 + lpm / 5)) : 2;
-    const durW = flowing ? Math.max(0.5, 3.2 / (1 + (houseLpm || 5) / 5)) : 2;
+    const durW = outFlow ? Math.max(0.5, 3.2 / (1 + (outLpm || 5) / 5)) : 2;
 
     this._color('g-rete', fixed('rete') || COLD);
     const openCol = col('stop', PDC_COL.open);
@@ -1446,9 +1470,9 @@ class PdcFlowCard extends HTMLElement {
     this._text('t-lpm', lpm === null ? '—' : f1(lpm));
 
     // Rete -> contatore -> puffer segue il contatore; se il contatore non c'è segue il flusso verso casa
-    this._flow('wa', METER ? meterFlow : flowing, COLD, METER ? durM : durW);
-    this._flow('wb', flowing, COLD, durW);
-    this._flow('wout', flowing, COLD, durW);
+    this._flow('wa', METER ? meterFlow : outFlow, COLD, METER ? durM : durW);
+    this._flow('wb', outFlow, COLD, durW);
+    this._flow('wout', outFlow, COLD, durW);
     this._color('jn-w', COLD);
 
     // Puffer e autoclave
@@ -1477,8 +1501,8 @@ class PdcFlowCard extends HTMLElement {
     this._els['g-rpump'].classList.toggle('run', recOn);
 
     // Rubinetto
-    this._color('g-tap', fixed('rubinetto') || (flowing ? COLD : null));
-    this._els['g-tap'].classList.toggle('run', flowing);
+    this._color('g-tap', fixed('rubinetto') || (outFlow ? COLD : null));
+    this._els['g-tap'].classList.toggle('run', outFlow);
 
     // Litri di oggi
     let litriOggi = null;
@@ -1703,7 +1727,7 @@ const PDC_LABELS = {
   rete_potenza: 'Potenza (positiva = prelievo dalla rete)',
   rete_inverti: 'Segno invertito (positiva = immissione)',
   rete_stato: 'Stato della rete (on = collegata)',
-  soglia_energia: 'Rete e batteria animate sopra',
+  soglia_energia: 'Rete e batteria animate sopra (0 = sempre)',
   casa_potenza: 'Consumo della casa',
   nome_sezione_energia: 'Nome della sezione',
   colore_rete_elettrica: 'Colore icona e linea',

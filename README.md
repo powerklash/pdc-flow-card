@@ -4,7 +4,7 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia, u
 
 - **Energia:** pannelli fotovoltaici con uno o due inverter, batteria di accumulo, rete elettrica e casa. Ogni punto è collegato direttamente agli altri (per esempio batteria → casa) e i valori sono dentro le icone; più potenza passa, più i pallini corrono. Il traliccio si anima quando la casa preleva dalla rete. Dalla casa escono le utenze elettriche che scegli tu; se nessuna è accesa il disegno usa tutta la larghezza.
 - **Impianto:** temperatura esterna, pompa di calore, valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
-- **Acqua sanitaria:** rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto.
+- **Acqua sanitaria:** rete, stop, contatore (L/min e litri di oggi), puffer, autoclave, ricircolo dal bollitore e rubinetto. Il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione.
 
 ![Esempio della card](images/esempio.png)
 
@@ -128,7 +128,7 @@ utenze:
 | `batteria_inverti`, `rete_inverti` | `true` se il sensore usa il segno opposto |
 | `batteria_colora` | `true` colora la batteria secondo la carica: rosso quando è scarica, verde brillante quando è carica |
 | `batteria_min`, `batteria_max` | percentuale a cui la batteria è rossa e a cui è verde (predefinito 0 e 100) |
-| `soglia_energia` | potenza in kW sopra cui i flussi elettrici si animano (predefinito 0,1) |
+| `soglia_energia` | potenza in kW sopra cui rete e batteria si animano (predefinito 0: qualsiasi valore; pochi watt = pallini lentissimi) |
 | `demo` | `true` mostra dati di esempio finché non è impostata nessuna entità; è l'anteprima che compare nella scelta delle card |
 
 Esempio:
