@@ -16,6 +16,7 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia di
   - Nomi e valori sono dentro le icone.
   - Il traliccio si anima quando la casa preleva dalla rete.
   - Dalla casa escono le utenze elettriche che scegli tu. Se nessuna è accesa, il disegno usa tutta la larghezza.
+  - Ai lati dei pannelli ci sono l'ora dell'alba (a sinistra) e del tramonto (a destra), presi dal sole di Home Assistant.
   - Quando il fotovoltaico non produce, il pannello diventa più piccolo, gli inverter spariscono e al posto del sole compare la luna (di notte) o una nuvola (di giorno, con il brutto tempo).
 - **Impianto:**
   - pompa di calore con potenza, modalità e un'icona della funzione attiva (riscaldamento, raffrescamento, acqua sanitaria);
@@ -98,7 +99,7 @@ entities:
 |---|---|
 | `fv_potenza` | potenza prodotta dal fotovoltaico (se manca, è la somma degli inverter; i valori negativi contano come 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | potenza dei due inverter, disegnati sotto i pannelli |
-| `sole` | sole per alba e tramonto: decide tra luna e nuvola quando il fotovoltaico non produce (vuoto = `sun.sun`) |
+| `sole` | sole: ora di alba e tramonto, e scelta tra luna e nuvola quando il fotovoltaico non produce (vuoto = `sun.sun`) |
 | `fv_previsione` | potenza prevista adesso (per esempio Forecast.Solar): con 0 W previsti compare la luna |
 | `meteo` | entità meteo: con pioggia o neve compaiono gocce o fiocchi sotto la nuvola |
 | `batteria_livello`, `batteria_potenza` | carica della batteria (%) e potenza (positiva = in scarica) |
@@ -166,6 +167,7 @@ utenze:
 | `temperature` | per ogni temperatura `colora: true` e `min` / `max`: scala da celeste a rosso |
 | `soglia_energia` | potenza in kW sopra cui rete e batteria si animano (predefinito 0: qualsiasi valore) |
 | `fv_compatto` | `false` lascia il fotovoltaico grande anche quando non produce (predefinito: si rimpicciolisce) |
+| `alba_tramonto` | `false` nasconde l'ora di alba e tramonto ai lati dei pannelli (le scritte si cambiano con `nomi: alba` e `nomi: tramonto`) |
 | `batteria_inverti`, `rete_inverti` | `true` se il sensore usa il segno opposto |
 | `batteria_colora` | `true` colora la batteria secondo la carica: rossa quando è scarica, verde brillante quando è carica |
 | `batteria_min`, `batteria_max` | percentuale a cui la batteria è rossa e a cui è verde (predefinito 0 e 100) |
@@ -206,6 +208,7 @@ A Home Assistant dashboard card that draws an animated view of the home's energy
   - Names and values are inside the icons.
   - The pylon is animated while the house draws power from the grid.
   - Electrical loads you choose branch out of the house. When none is on, the drawing uses the full width.
+  - Next to the panels are the sunrise time (left) and sunset time (right), taken from Home Assistant's sun entity.
   - When the solar panels produce nothing, the panel gets smaller, the inverters are hidden and the sun is replaced by the moon (at night) or a cloud (in the daytime, with bad weather).
 - **Heating system:**
   - heat pump with power, mode and an icon of the active function (heating, cooling, hot water);
@@ -249,7 +252,7 @@ See the YAML example in the Italian section above: the keys are the same.
 |---|---|
 | `fv_potenza` | solar power (if missing, the sum of the inverters; negative values count as 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | power of the two inverters, drawn below the panels |
-| `sole` | sun entity for sunrise and sunset: picks the moon or the cloud when the panels produce nothing (empty = `sun.sun`) |
+| `sole` | sun entity: sunrise and sunset times, and the choice between moon and cloud when the panels produce nothing (empty = `sun.sun`) |
 | `fv_previsione` | forecast power right now (for example Forecast.Solar): with 0 W expected the moon is shown |
 | `meteo` | weather entity: rain or snow adds drops or flakes below the cloud |
 | `batteria_livello`, `batteria_potenza` | battery charge (%) and power (positive = discharging) |
@@ -308,6 +311,7 @@ In the visual editor use **Aggiungi utenza elettrica** (add electrical load). Ke
 | `temperature` | per temperature `colora: true` and `min` / `max`: light blue to red scale |
 | `soglia_energia` | kW above which grid and battery are animated (default 0: any value) |
 | `fv_compatto` | `false` keeps the solar panel full size when it produces nothing (default: it shrinks) |
+| `alba_tramonto` | `false` hides the sunrise and sunset times next to the panels (labels can be changed with `nomi: alba` and `nomi: tramonto`) |
 | `batteria_inverti`, `rete_inverti` | `true` if the sensor uses the opposite sign |
 | `batteria_colora` | `true` colours the battery by charge: red when empty, bright green when full |
 | `batteria_min`, `batteria_max` | charge (%) at which the battery is red and green (default 0 and 100) |

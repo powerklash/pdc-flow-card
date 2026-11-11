@@ -39,18 +39,21 @@
  *   (sentina_potenza, sentina_energia, sentina_stato: pompa sentina sotto il puffer, seconda riga)
  *   (sole: sun.sun, fv_previsione: potenza prevista adesso, meteo: weather; servono per luna e nuvola)
  *   fv_compatto: false         # facoltativo: senza produzione il fotovoltaico resta grande (predefinito: si rimpicciolisce)
+ *   alba_tramonto: false       # facoltativo: nasconde l'ora di alba (a sinistra) e tramonto (a destra) dei pannelli
  *   demo: true                 # facoltativo: dati di esempio finché non si imposta un'entità
  *   batteria_inverti / rete_inverti: true   # facoltativo: segno opposto della potenza
  *   batteria_colora: true      # facoltativo: batteria da rosso (scarica) a verde (carica); batteria_min / batteria_max in %
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.24.0';
+const PDC_VERSION = '0.25.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
   sezione_energia: 'Energia',
   fotovoltaico: 'Fotovoltaico',
+  alba: 'alba',
+  tramonto: 'tramonto',
   inverter_1: 'Inverter 1',
   inverter_2: 'Inverter 2',
   batteria: 'Batteria',
@@ -114,7 +117,7 @@ const PDC_ENTITY_ORDER = [
 ];
 const PDC_CONFIG_ORDER = [
   'type', 'title', 'demo', 'entities', 'utenze',
-  'fv_compatto', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max',
+  'fv_compatto', 'alba_tramonto', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max',
   'soglia_pdc', 'soglia_acs', 'temperature',
   'acqua_portata_unita', 'puffer',
   'nomi', 'colori',
@@ -172,6 +175,8 @@ for (const [k, [dom, state, unit]] of Object.entries(PDC_DEMO)) {
   if (!k.startsWith('u_')) PDC_DEMO_ENT[k] = id;
   PDC_DEMO_STATES[id] = { entity_id: id, state: String(state), attributes: unit ? { unit_of_measurement: unit } : {} };
 }
+// Sole per l'esempio: ora di alba e tramonto ai lati dei pannelli
+PDC_DEMO_STATES['sun.sun'] = { entity_id: 'sun.sun', state: 'above_horizon', attributes: { next_rising: '2026-06-21T05:34:00', next_setting: '2026-06-21T21:12:00' } };
 const PDC_DEMO_UTENZE = [
   { entity: 'sensor.pdc_esempio_u_pdc', nome: 'Pompa di calore', icona: 'mdi:heat-pump' },
   { entity: 'sensor.pdc_esempio_u_autoclave', nome: 'Autoclave', icona: 'mdi:water-pump' },
@@ -366,11 +371,11 @@ const PDC_SVG_ENERGY = `
       <circle class="sunc" cx="70" cy="24" r="7"/>
       <path class="rays" d="M70 11 V14 M70 34 V37 M57 24 H60 M80 24 H83 M60.8 14.8 L62.9 16.9 M77.1 31.1 L79.2 33.2 M60.8 33.2 L62.9 31.1 M77.1 16.9 L79.2 14.8"/>
     </g>
-    <g id="fv-moon" class="hidden" transform="translate(60 34)">
+    <g id="fv-moon" class="hidden" transform="translate(60 28)">
       <path class="moon" d="M-1.3 -8.9 A9 9 0 1 0 8.4 3.2 A8 8 0 0 1 -1.3 -8.9 Z"/>
       <path class="star" d="M14 -10 v4 M12 -8 h4 M-12 -11 v3 M-13.5 -9.5 h3"/>
     </g>
-    <g id="fv-cloud" class="hidden" transform="translate(62 34)">
+    <g id="fv-cloud" class="hidden" transform="translate(62 26)">
       <path class="cloud" d="M-8 5 A5 5 0 0 1 -8.5 -4.5 A7 7 0 0 1 4.5 -6.5 A6.5 6.5 0 0 1 9 5 Z"/>
       <path class="rain hidden" id="fv-rain" d="M-4 9 l-1.5 4 M1.5 9 l-1.5 4 M7 9 l-1.5 4"/>
       <path class="snow hidden" id="fv-snow" d="M-4 11 h0.1 M1.5 13 h0.1 M7 11 h0.1"/>
@@ -381,6 +386,13 @@ const PDC_SVG_ENERGY = `
     </g>
     <text x="0" y="49" class="lbl c xs halo" id="n-fotovoltaico">Fotovoltaico</text>
     <text x="0" y="65" class="val c halo" id="t-fv">—</text>
+    <!-- Ora di alba (a sinistra) e tramonto (a destra) dei pannelli -->
+    <g id="fv-times" class="hidden">
+      <text x="-58" y="55" class="lbl xs e" id="n-alba">alba</text>
+      <text x="-58" y="67" class="tv xs e" id="t-alba">—</text>
+      <text x="58" y="55" class="lbl xs" id="n-tramonto">tramonto</text>
+      <text x="58" y="67" class="tv xs" id="t-tramonto">—</text>
+    </g>
   </g>
 
   <!-- Inverter: valore dentro -->
@@ -978,6 +990,23 @@ class PdcFlowCard extends HTMLElement {
     return Math.max(0, v);
   }
 
+  // Ora (hh:mm) come nel profilo utente di HA: lingua, 12/24 ore e fuso del server se scelto
+  _time(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    const loc = this._hass.locale || {};
+    const o = { hour: '2-digit', minute: '2-digit' };
+    if (loc.time_zone === 'server' && this._hass.config && this._hass.config.time_zone) o.timeZone = this._hass.config.time_zone;
+    if (loc.time_format === '12') o.hour12 = true;
+    else if (loc.time_format === '24') o.hour12 = false;
+    try {
+      return d.toLocaleTimeString(loc.language || this._hass.language || 'it', o);
+    } catch (e) {
+      return d.toTimeString().slice(0, 5);
+    }
+  }
+
   // Formato dei numeri come nel profilo utente di HA
   _numberLocale() {
     const loc = this._hass.locale || {};
@@ -1313,12 +1342,12 @@ class PdcFlowCard extends HTMLElement {
 
     // ---- Fotovoltaico fermo: più piccolo, senza sole e inverter; luna di notte, nuvola di giorno ----
     const COMPACT = c.fv_compatto !== false && !fvOn;
+    const sunId = this._ids('sole')[0] || (this._hass.states['sun.sun'] ? 'sun.sun' : null);
+    const sunSt = sunId ? this._hass.states[sunId] : null;
     let night = false;
     let wx = '';
     if (COMPACT && FV) {
       // notte: dal sole (alba/tramonto) oppure dalla previsione di produzione (0 W previsti = notte)
-      const sunId = this._ids('sole')[0] || (this._hass.states['sun.sun'] ? 'sun.sun' : null);
-      const sunSt = sunId ? this._hass.states[sunId] : null;
       const fc = this._kw('fv_previsione');
       const hr = new Date().getHours();
       if (sunSt && ['above_horizon', 'below_horizon'].includes(sunSt.state)) night = sunSt.state === 'below_horizon';
@@ -1336,6 +1365,14 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['fv-cloud'], COMPACT && !night);
     this._vis(['fv-rain'], rainy);
     this._vis(['fv-snow'], snowy);
+    // Ora di alba e tramonto (prossimi, dal sole), nel formato orario del profilo di HA
+    const sa = sunSt && sunSt.attributes ? sunSt.attributes : {};
+    const TIMES = FV && c.alba_tramonto !== false && !!(sa.next_rising || sa.next_setting);
+    this._vis(['fv-times'], TIMES);
+    if (TIMES) {
+      this._text('t-alba', this._time(sa.next_rising));
+      this._text('t-tramonto', this._time(sa.next_setting));
+    }
     const E = COMPACT ? PDC_E_COMPACT : PDC_E_FULL;
 
     // ---- Disposizione: con utenze a destra, oppure su tutta la larghezza ----
@@ -1358,6 +1395,13 @@ class PdcFlowCard extends HTMLElement {
       else this._els['fv-shape'].removeAttribute('transform');
       this._els['n-fotovoltaico'].setAttribute('y', COMPACT ? 43 : 49);
       this._els['t-fv'].setAttribute('y', COMPACT ? 56 : 65);
+      // alba e tramonto più vicini al pannello piccolo
+      const tx = COMPACT ? 46 : 58;
+      const ty = COMPACT ? 50 : 55;
+      for (const [id, x, y] of [['n-alba', -tx, ty], ['t-alba', -tx, ty + 12], ['n-tramonto', tx, ty], ['t-tramonto', tx, ty + 12]]) {
+        this._els[id].setAttribute('x', x);
+        this._els[id].setAttribute('y', y);
+      }
       this._layKey = layKey;
     }
 
@@ -1682,6 +1726,7 @@ const PDC_FIELD_SELECTORS = {
   inverter_1_potenza: PDC_SENSOR,
   inverter_2_potenza: PDC_SENSOR,
   fv_compatto: { boolean: {} },
+  alba_tramonto: { boolean: {} },
   sole: { entity: { domain: 'sun' } },
   fv_previsione: PDC_SENSOR,
   meteo: { entity: { domain: 'weather' } },
@@ -1744,7 +1789,7 @@ const PDC_FIELD_SELECTORS = {
 
 // [chiave, titolo, icona, campi]; "nome_x" e "colore_x" si riferiscono alle sezioni nomi/colori
 const PDC_GROUPS = [
-  ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'fv_compatto', 'sole', 'fv_previsione', 'meteo', 'nome_fotovoltaico', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter']],
+  ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'fv_compatto', 'alba_tramonto', 'sole', 'fv_previsione', 'meteo', 'nome_fotovoltaico', 'nome_alba', 'nome_tramonto', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter']],
   ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'nome_batteria', 'colore_batteria']],
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
   ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'nome_casa', 'colore_casa']],
@@ -1768,7 +1813,7 @@ const PDC_GROUPS = [
   ['sentina', 'Pompa sentina', 'mdi:water-pump', ['sentina_potenza', 'sentina_energia', 'sentina_stato', 'nome_sentina', 'colore_sentina']],
 ];
 
-const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto'];
+const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto'];
 
 const PDC_TNUM = { number: { min: -30, max: 100, step: 1, mode: 'box', unit_of_measurement: '°C' } };
 
@@ -1846,6 +1891,9 @@ const PDC_LABELS = {
   nome_inverter_2: 'Nome inverter 2',
   colore_inverter: 'Colore inverter',
   fv_compatto: 'Più piccolo quando non produce (luna di notte, nuvola di giorno)',
+  alba_tramonto: 'Ora di alba (a sinistra) e tramonto (a destra) dei pannelli',
+  nome_alba: 'Scritta prima dell’ora di alba',
+  nome_tramonto: 'Scritta prima dell’ora di tramonto',
   sole: 'Sole (alba e tramonto)',
   fv_previsione: 'Previsione di produzione adesso',
   meteo: 'Meteo (pioggia o neve sotto la nuvola)',
@@ -2012,6 +2060,7 @@ class PdcFlowCardEditor extends HTMLElement {
     for (const k of PDC_OPT_KEYS) if (config[k] !== undefined) d[k] = config[k];
     if (!d.acqua_portata_unita) d.acqua_portata_unita = 'auto';
     d.fv_compatto = config.fv_compatto !== false;
+    d.alba_tramonto = config.alba_tramonto !== false;
     if (!d.rete_stato && ent.gateway_stato_rete) d.rete_stato = ent.gateway_stato_rete;
     (Array.isArray(config.utenze) ? config.utenze : []).forEach((u, i) => {
       if (!u || typeof u !== 'object') return;
@@ -2082,6 +2131,7 @@ class PdcFlowCardEditor extends HTMLElement {
     if (!cfg.batteria_colora) delete cfg.batteria_colora;
     if (!cfg.rete_inverti) delete cfg.rete_inverti;
     if (cfg.fv_compatto !== false) delete cfg.fv_compatto;
+    if (cfg.alba_tramonto !== false) delete cfg.alba_tramonto;
     delete cfg.pulsanti;
     delete cfg.entities.gateway_stato_rete;
 
