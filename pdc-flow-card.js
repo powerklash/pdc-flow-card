@@ -21,6 +21,7 @@
  *       colore: teal              # facoltativo
  *       nascondi_a_zero: true     # facoltativo: la riga sparisce quando è spenta
  *       soglia: 5                 # facoltativo: accesa sopra questo valore (unità del sensore)
+ *     locale_temperatura, locale_umidita (locale caldaia, tra pompa di calore e bollitore),
  *     pdc_potenza (anche lista), riscaldamento, raffrescamento,
  *     acs_potenza | acs_attiva, pdc_mandata, pdc_ritorno, acs_temperatura,
  *     accumulo_temperatura, accumulo_ingresso, circolatore, pavimento_mandata,
@@ -48,7 +49,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.28.0';
+const PDC_VERSION = '0.29.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -81,13 +82,14 @@ const PDC_NOMI = {
   ricircolo: 'Ricircolo',
   rubinetto: 'Acqua',
   sentina: 'Pompa sentina',
+  locale: 'Locale caldaia',
   setpoint: 'setpoint',
 };
 
 // Componenti a cui si può dare un colore (sezione "colori:")
 const PDC_COLORI = [
   'fotovoltaico', 'inverter', 'batteria', 'rete_elettrica', 'casa',
-  'esterno', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo',
+  'esterno', 'locale', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo',
   'ingresso_accumulo', 'circolatore', 'pavimento', 'rete', 'acqua_fredda', 'stop', 'contatore', 'puffer',
   'autoclave', 'ricircolo', 'rubinetto', 'sentina',
 ];
@@ -102,7 +104,7 @@ const PDC_ENTITY_KEYS = [
   'circolatore', 'pavimento_mandata', 'pavimento_ritorno', 'acqua_valvola', 'acqua_portata',
   'acqua_totale', 'acqua_oggi', 'ricircolo', 'autoclave_velocita', 'autoclave_pressione',
   'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'acs_setpoint', 'accumulo_setpoint',
-  'sentina_potenza', 'sentina_energia', 'sentina_stato',
+  'sentina_potenza', 'sentina_energia', 'sentina_stato', 'locale_temperatura', 'locale_umidita',
 ];
 const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k));
 
@@ -110,7 +112,7 @@ const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k)
 const PDC_ENTITY_ORDER = [
   'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
   'rete_potenza', 'rete_stato', 'casa_potenza',
-  'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
+  'locale_temperatura', 'locale_umidita', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
   'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
   'acqua_valvola', 'acqua_stop', 'acqua_portata', 'acqua_totale', 'acqua_oggi',
@@ -145,6 +147,8 @@ const PDC_DEMO = {
   u_autoclave: ['sensor', 450, 'W'],
   u_lavatrice: ['sensor', 0.12, 'kW'],
   temperatura_esterna: ['sensor', 6.5, '°C'],
+  locale_temperatura: ['sensor', 19.5, '°C'],
+  locale_umidita: ['sensor', 55, '%'],
   pdc_potenza: ['sensor', 1.8, 'kW'],
   riscaldamento: ['binary_sensor', 'on'],
   raffrescamento: ['binary_sensor', 'off'],
@@ -277,8 +281,8 @@ function pdcCustomColor(v) {
 }
 
 // Temperature con scala colori propria (sezione "temperature:")
-const PDC_TEMPS = ['esterno', 'mandata', 'ritorno', 'ingresso_accumulo', 'bollitore', 'accumulo', 'pavimento'];
-const PDC_TEMP_RANGE = { esterno: [-5, 35] }; // le altre: 10–55 °C
+const PDC_TEMPS = ['esterno', 'locale', 'mandata', 'ritorno', 'ingresso_accumulo', 'bollitore', 'accumulo', 'pavimento'];
+const PDC_TEMP_RANGE = { esterno: [-5, 35], locale: [10, 30] }; // le altre: 10–55 °C
 
 // Colore in base alla temperatura: celeste (min) → viola → rosa → rosso (max)
 // Colore della batteria in base alla carica: rosso (min) → arancio → giallo → verde brillante (max)
@@ -469,6 +473,22 @@ ${PDC_SVG_ENERGY}
 
   <!-- ===== SEZIONE IMPIANTO ===== -->
   <text x="18" y="24" class="sec" id="n-sezione_impianto">IMPIANTO</text>
+  <!-- Locale caldaia: nome, temperatura e umidità tra pompa di calore e bollitore, sopra la mandata -->
+  <g id="g-locale" class="clickable hidden" data-key="locale_temperatura|locale_umidita">
+    <text x="183" y="36" class="lbl c xs" id="n-locale">Locale caldaia</text>
+    <g id="lc-t">
+      <g transform="translate(127.3 35.55) scale(0.55)">
+        <path class="ico" d="M21.5 22.5 V11.5 a2.5 2.5 0 0 1 5 0 V22.5 a4.5 4.5 0 1 1 -5 0 Z"/>
+        <circle class="ico-fill" cx="24" cy="26.5" r="2"/>
+      </g>
+      <text x="146" y="51" class="tv" id="t-loc-t">—</text>
+    </g>
+    <g id="lc-h">
+      <path class="hdrop" d="M196 40 C198.6 43 200 45.2 200 47.6 A4 4 0 0 1 192 47.6 C192 45.2 193.4 43 196 40 Z"/>
+      <text x="203" y="51" class="tv" id="t-loc-h">—</text>
+    </g>
+  </g>
+
   <g id="g-ext" class="clickable" data-key="temperatura_esterna" transform="translate(140 -3)">
     <path class="ico" d="M21.5 22.5 V11.5 a2.5 2.5 0 0 1 5 0 V22.5 a4.5 4.5 0 1 1 -5 0 Z"/>
     <circle class="ico-fill" cx="24" cy="26.5" r="2"/>
@@ -719,6 +739,7 @@ const PDC_CSS = `
 
   .ico      { fill: none; stroke: var(--c, var(--secondary-text-color)); stroke-width: 1.4; }
   .ico-fill { fill: var(--c, var(--secondary-text-color)); }
+  .hdrop    { fill: #4fc3f7; fill-opacity: .35; stroke: #4fc3f7; stroke-width: 1.2; stroke-linejoin: round; }
   .ico2     { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .drop     { fill: var(--c, var(--pdc-idle)); fill-opacity: .35; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.5; }
   .drip     { fill: var(--c, var(--pdc-idle)); opacity: 0; transition: opacity .4s; }
@@ -1275,6 +1296,11 @@ class PdcFlowCard extends HTMLElement {
     const EXT_H = EXT && EN && (HOME || this._utenze.length > 0);
     this._vis(['g-ext'], EXT && !EXT_H);
     this._vis(['g-ext-h'], EXT_H);
+    const LOC_T = has('locale_temperatura');
+    const LOC_H = has('locale_umidita');
+    this._vis(['g-locale'], MAIN && (LOC_T || LOC_H));
+    this._vis(['lc-t'], LOC_T);
+    this._vis(['lc-h'], LOC_H);
     this._placeExt(EN);
     this._vis(['g-pdc', 't-pdc-pow', 't-pdc-mode', 'n-pompa_di_calore'], PDC);
     this._vis(['f-s1', 'f-r2b'], showS1);
@@ -1622,6 +1648,13 @@ class PdcFlowCard extends HTMLElement {
     this._text('t-ext', tExt === null ? '—' : f1(tExt) + ' °C', colora('esterno') ? extTemp : '');
     this._color('g-ext-h', fixed('esterno') || (colora('esterno') ? extTemp : null));
     this._text('t-ext-h', tExt === null ? '—' : f1(tExt) + ' °C', colora('esterno') ? extTemp : '');
+    // Locale caldaia
+    const tLoc = this._num('locale_temperatura');
+    const hLoc = this._num('locale_umidita');
+    const locTemp = tc('locale', tLoc);
+    this._color('lc-t', fixed('locale') || (colora('locale') ? locTemp : null));
+    this._text('t-loc-t', tLoc === null ? '—' : f1(tLoc) + ' °C', colora('locale') ? locTemp : '');
+    this._text('t-loc-h', hLoc === null ? '—' : f0(hLoc) + ' %');
     paint('n-esterno', colora('esterno') ? extTemp : null);
 
     this._color('g-pdc', pdcIcon);
@@ -1851,6 +1884,8 @@ const PDC_FIELD_SELECTORS = {
   rete_stato: PDC_ANY,
   soglia_energia: { number: { min: 0, max: 2, step: 0.01, mode: 'box', unit_of_measurement: 'kW' } },
   temperatura_esterna: PDC_SENSOR,
+  locale_temperatura: PDC_SENSOR,
+  locale_umidita: PDC_SENSOR,
   pdc_potenza: { entity: { domain: 'sensor', multiple: true } },
   riscaldamento: PDC_ANY,
   raffrescamento: PDC_ANY,
@@ -1904,6 +1939,7 @@ const PDC_GROUPS = [
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
   ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'nome_casa', 'colore_casa']],
   ['esterno', 'Temperatura esterna', 'mdi:thermometer', ['temperatura_esterna', 'nome_esterno', 'colore_esterno', 'tcolora_esterno', 'tmin_esterno', 'tmax_esterno']],
+  ['locale', 'Locale caldaia', 'mdi:home-thermometer', ['locale_temperatura', 'locale_umidita', 'nome_locale', 'colore_locale', 'tcolora_locale', 'tmin_locale', 'tmax_locale']],
   ['pompa_di_calore', 'Pompa di calore', 'mdi:heat-pump', ['pdc_potenza', 'riscaldamento', 'raffrescamento', 'soglia_pdc', 'nome_pompa_di_calore', 'colore_pompa_di_calore']],
   ['valvola_3_vie', 'Valvola 3 vie (ciclo ACS)', 'mdi:valve', ['acs_potenza', 'acs_attiva', 'soglia_acs', 'nome_valvola_3_vie', 'colore_valvola_3_vie']],
   ['mandata', 'Mandata', 'mdi:thermometer-chevron-up', ['pdc_mandata', 'nome_mandata', 'colore_mandata', 'tcolora_mandata', 'tmin_mandata', 'tmax_mandata']],
@@ -1960,7 +1996,7 @@ const PDC_SECTIONS = [
   ['energia', 'Energia', 'mdi:lightning-bolt', ['nome_sezione_energia', 'soglia_energia'],
     ['esterno', 'fotovoltaico', 'batteria', 'rete_elettrica', 'casa']],
   ['impianto', 'Pompa di calore e impianto', 'mdi:heat-pump', ['nome_sezione_impianto', 'nome_setpoint'],
-    ['pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo', 'ingresso_accumulo', 'circolatore', 'pavimento']],
+    ['locale', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo', 'ingresso_accumulo', 'circolatore', 'pavimento']],
   ['acqua', 'Acqua sanitaria', 'mdi:water', ['nome_sezione_acqua'],
     ['rete', 'stop', 'contatore', 'puffer', 'autoclave', 'ricircolo', 'rubinetto', 'sentina']],
 ];
@@ -2028,6 +2064,8 @@ const PDC_LABELS = {
   colore_batteria: 'Colore batteria e linea',
   colore_casa: 'Colore icona e linea',
   temperatura_esterna: 'Sensore temperatura',
+  locale_temperatura: 'Temperatura del locale',
+  locale_umidita: 'Umidità del locale',
   pdc_potenza: 'Potenza (uno o più sensori, vengono sommati)',
   riscaldamento: 'Modalità riscaldamento',
   raffrescamento: 'Modalità raffrescamento',

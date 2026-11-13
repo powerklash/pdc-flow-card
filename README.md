@@ -22,7 +22,8 @@ Card per la dashboard di Home Assistant che disegna in modo animato l'energia di
   - Quando il fotovoltaico non produce, il pannello diventa più piccolo, gli inverter spariscono e al posto del sole compare la luna (di notte) o una nuvola (di giorno, con il brutto tempo).
 - **Impianto:**
   - pompa di calore con potenza, modalità e un'icona della funzione attiva (riscaldamento, raffrescamento, acqua sanitaria);
-  - valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint.
+  - valvola a 3 vie, bollitore, accumulo, circolatore e pavimento, con mandata, ritorno e setpoint;
+  - temperatura e umidità del locale caldaia, tra pompa di calore e bollitore.
 - **Acqua sanitaria:**
   - la linea parte da un piccolo cerchio con la goccia, poi contatore (L/min, litri di oggi, totale e valvola aperta/chiusa, tutto dentro il contatore), puffer, autoclave e rubinetto, centrati sulla stessa linea; la pompa del ricircolo è sotto il bollitore;
   - il contatore riempie il puffer; dal puffer al rubinetto l'acqua scorre quando l'autoclave è in funzione;
@@ -72,6 +73,8 @@ entities:
   rete_stato: binary_sensor.rete_collegata
   casa_potenza: sensor.casa_consumo
   # Pompa di calore e impianto
+  locale_temperatura: sensor.locale_temperatura
+  locale_umidita: sensor.locale_umidita
   pdc_potenza: sensor.pdc_potenza
   riscaldamento: binary_sensor.pdc_riscaldamento
   raffrescamento: binary_sensor.pdc_raffrescamento
@@ -109,6 +112,7 @@ entities:
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
 | `temperatura_esterna` | temperatura esterna, piccola a sinistra del tetto della casa (senza la casa in alto a sinistra; senza la parte energia nel titolo dell'impianto) |
+| `locale_temperatura`, `locale_umidita` | temperatura e umidità del locale caldaia, tra pompa di calore e bollitore (nome con `nomi: locale`, colori con `temperature: locale`) |
 | `pdc_potenza` | potenza della pompa di calore (anche una lista di sensori, che vengono sommati) |
 | `riscaldamento`, `raffrescamento` | modalità attiva della pompa di calore |
 | `acs_potenza` oppure `acs_attiva` | potenza del ciclo acqua calda, oppure un'entità on/off |
@@ -217,7 +221,8 @@ A Home Assistant dashboard card that draws an animated view of the home's energy
   - When the solar panels produce nothing, the panel gets smaller, the inverters are hidden and the sun is replaced by the moon (at night) or a cloud (in the daytime, with bad weather).
 - **Heating system:**
   - heat pump with power, mode and an icon of the active function (heating, cooling, hot water);
-  - 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints.
+  - 3-way valve, hot water tank, buffer tank, circulator and underfloor heating, with flow, return and setpoints;
+  - temperature and humidity of the boiler room, between heat pump and hot water tank.
 - **Domestic water:**
   - the line starts from a small circle with a water drop, then water meter (L/min, today's litres, total and shut-off valve open/closed, all inside the meter), break tank, booster pump and tap, centred on the same line; the recirculation pump sits below the hot water tank;
   - the meter fills the break tank; water flows from the tank to the tap only while the booster pump is running;
@@ -265,6 +270,7 @@ See the YAML example in the Italian section above: the keys are the same.
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
 | `casa_potenza` | house consumption (calculated if missing) |
 | `temperatura_esterna` | outdoor temperature, small, left of the house roof (without the house, top-left; without the energy section, in the heating system title) |
+| `locale_temperatura`, `locale_umidita` | boiler room temperature and humidity, between heat pump and hot water tank (label with `nomi: locale`, colours with `temperature: locale`) |
 | `pdc_potenza` | heat pump power (also a list of sensors, which are added up) |
 | `riscaldamento`, `raffrescamento` | heating / cooling mode active |
 | `acs_potenza` or `acs_attiva` | hot-water cycle power, or an on/off entity |
