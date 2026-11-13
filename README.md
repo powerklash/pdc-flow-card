@@ -74,6 +74,10 @@ entities:
   casa_potenza: sensor.casa_consumo
   # Pompa di calore e impianto
   allarme: alarm_control_panel.allarme
+  cancello_stato: binary_sensor.cancello
+  cancello_luce: switch.luce_cancello
+  tettoia_prese: switch.prese_tettoia
+  ingresso_prese: switch.prese_ingresso
   locale_temperatura: sensor.locale_temperatura
   locale_umidita: sensor.locale_umidita
   pdc_potenza: sensor.pdc_potenza
@@ -114,6 +118,8 @@ entities:
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
 | `temperatura_esterna` | temperatura esterna, piccola a sinistra del tetto della casa (senza la casa in alto a sinistra; senza la parte energia nel titolo dell'impianto) |
 | `allarme` | allarme (`alarm_control_panel`): scudo al centro del tetto della casa, con l'icona dell'entità o quella di HA per lo stato; verde inserito, grigio disinserito, arancione in attesa, rosso lampeggiante scattato |
+| `cancello_stato`, `cancello_luce` | cancello sotto la casa: aperto (arancione, `on`/`open`) o chiuso (grigio), con la lampada accesa o spenta (nome con `nomi: cancello`, colore fisso con `colori: cancello`) |
+| `tettoia_prese`, `ingresso_prese` | prese di corrente della tettoia (a sinistra) e dell'ingresso (a destra), sotto il cancello e allineate al fondo della batteria: **toccando il pulsante si accende o spegne la presa**; giallo acceso, grigio spento (nomi con `nomi: tettoia` e `nomi: ingresso`, colore con `colori: prese`) |
 | `locale_temperatura`, `locale_umidita` | temperatura e umidità del locale caldaia, tra pompa di calore e bollitore (nome con `nomi: locale`, colori con `temperature: locale`) |
 | `pdc_potenza` | potenza della pompa di calore (anche una lista di sensori, che vengono sommati) |
 | `riscaldamento`, `raffrescamento` | modalità attiva della pompa di calore |
@@ -273,6 +279,8 @@ See the YAML example in the Italian section above: the keys are the same.
 | `casa_potenza` | house consumption (calculated if missing) |
 | `temperatura_esterna` | outdoor temperature, small, left of the house roof (without the house, top-left; without the energy section, in the heating system title) |
 | `allarme` | alarm (`alarm_control_panel`): shield in the middle of the house roof, with the entity's icon or HA's icon for the state; green armed, grey disarmed, orange pending, flashing red triggered |
+| `cancello_stato`, `cancello_luce` | gate below the house: open (orange, `on`/`open`) or closed (grey), with the lamp on or off (label with `nomi: cancello`, fixed colour with `colori: cancello`) |
+| `tettoia_prese`, `ingresso_prese` | power sockets of the canopy (left) and the entrance (right), below the gate and aligned with the bottom of the battery: **tapping the button turns the socket on or off**; yellow on, grey off (labels with `nomi: tettoia` and `nomi: ingresso`, colour with `colori: prese`) |
 | `locale_temperatura`, `locale_umidita` | boiler room temperature and humidity, between heat pump and hot water tank (label with `nomi: locale`, colours with `temperature: locale`) |
 | `pdc_potenza` | heat pump power (also a list of sensors, which are added up) |
 | `riscaldamento`, `raffrescamento` | heating / cooling mode active |

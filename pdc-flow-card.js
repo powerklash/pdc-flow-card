@@ -21,6 +21,9 @@
  *       colore: teal              # facoltativo
  *       nascondi_a_zero: true     # facoltativo: la riga sparisce quando è spenta
  *       soglia: 5                 # facoltativo: accesa sopra questo valore (unità del sensore)
+ *     cancello_stato (on/open = aperto), cancello_luce (on = accesa): cancello sotto la casa,
+ *     tettoia_prese, ingresso_prese (switch delle prese): tettoia e ingresso sotto il cancello,
+ *       il pulsante accende e spegne la presa,
  *     allarme (alarm_control_panel: scudo nel tetto della casa, icona e colore secondo lo stato),
  *     locale_temperatura, locale_umidita (locale caldaia, tra pompa di calore e bollitore),
  *     pdc_potenza (anche lista), riscaldamento, raffrescamento,
@@ -50,7 +53,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.30.0';
+const PDC_VERSION = '0.31.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -84,19 +87,22 @@ const PDC_NOMI = {
   rubinetto: 'Acqua',
   sentina: 'Pompa sentina',
   locale: 'Locale caldaia',
+  cancello: 'Cancello',
+  tettoia: 'Tettoia',
+  ingresso: 'Ingresso',
   setpoint: 'setpoint',
 };
 
 // Componenti a cui si può dare un colore (sezione "colori:")
 const PDC_COLORI = [
-  'fotovoltaico', 'inverter', 'batteria', 'rete_elettrica', 'casa',
+  'fotovoltaico', 'inverter', 'batteria', 'rete_elettrica', 'casa', 'cancello', 'prese',
   'esterno', 'locale', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo',
   'ingresso_accumulo', 'circolatore', 'pavimento', 'rete', 'acqua_fredda', 'stop', 'contatore', 'puffer',
   'autoclave', 'ricircolo', 'rubinetto', 'sentina',
 ];
 
 // Sezione energia (sopra l'impianto)
-const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme'];
+const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese'];
 
 const PDC_ENTITY_KEYS = [
   ...PDC_ENERGY_KEYS,
@@ -112,7 +118,7 @@ const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k)
 // Ordine delle chiavi nello YAML scritto dall'editor: energia, pompa di calore e impianto, acqua sanitaria
 const PDC_ENTITY_ORDER = [
   'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
-  'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme',
+  'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese',
   'locale_temperatura', 'locale_umidita', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
   'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
@@ -144,6 +150,10 @@ const PDC_DEMO = {
   rete_potenza: ['sensor', 0.02, 'kW'],
   casa_potenza: ['sensor', 2.62, 'kW'],
   allarme: ['alarm_control_panel', 'armed_home'],
+  cancello_stato: ['binary_sensor', 'off'],
+  cancello_luce: ['switch', 'on'],
+  tettoia_prese: ['switch', 'on'],
+  ingresso_prese: ['switch', 'off'],
   rete_stato: ['binary_sensor', 'on'],
   u_pdc: ['sensor', 1.8, 'kW'],
   u_autoclave: ['sensor', 450, 'W'],
@@ -441,6 +451,39 @@ const PDC_SVG_ENERGY = `
     <rect class="hit" x="-32" y="-34" width="64" height="64"/>
     <path class="roof" d="M-30 -6 L0 -32 L30 -6 Z"/>
     <path class="ico2" d="M17 -17.3 V-28 H22 V-12.9 M-24 -6 V28 H24 V-6"/>
+    <!-- Cancello sotto la casa: chiuso o aperto, lampione acceso o spento -->
+    <g id="g-gate" class="clickable hidden" data-key="cancello_stato|cancello_luce">
+      <rect class="hit" x="-30" y="31" width="60" height="36"/>
+      <g id="gate-lamp">
+        <path class="lrays" d="M-24 30 V27.5 M-29 33 H-31.5 M-19 33 H-16.5 M-27.6 29.6 L-29.3 27.9 M-20.4 29.6 L-18.7 27.9"/>
+        <circle class="lamp" cx="-24" cy="34" r="2.6"/>
+      </g>
+      <path class="gpost" d="M-24 37 V56 M24 37 V56"/>
+      <path class="gbars" id="gate-closed" d="M-24 41 H24 M-24 53 H24 M-16 41 V53 M-8 41 V53 M0 41 V53 M8 41 V53 M16 41 V53"/>
+      <path class="gbars hidden" id="gate-open" d="M-24 41 L-13 45 V56 L-24 53 M-18.5 43 V54.5 M24 41 L13 45 V56 L24 53 M18.5 43 V54.5"/>
+      <text x="0" y="65" class="lbl c xs" id="t-gate">Cancello</text>
+    </g>
+    <!-- Sotto il cancello: tettoia (sinistra) e ingresso (destra), il pulsante accende/spegne la presa.
+         La base è allineata al fondo della batteria (y 100). -->
+    <g id="tt1" class="hidden">
+      <title id="tt1-t">Tettoia</title>
+      <path class="troof" d="M-38 74 L-2 70.5"/>
+      <path class="tpost" d="M-34 73.6 V100 M-6 70.9 V100"/>
+      <g class="clickable tsw-g" data-toggle="tettoia_prese">
+        <circle class="tsw" cx="-20" cy="88" r="7"/>
+        <path class="tbolt" transform="translate(-20 88)" d="M1 -5 L-3.5 1 H-0.5 L-1 5 L3.5 -1 H0.5 Z"/>
+      </g>
+    </g>
+    <g id="tt2" class="hidden">
+      <title id="tt2-t">Ingresso</title>
+      <path class="troof" d="M2 78.5 L19.5 70 L37 78.5"/>
+      <rect class="tdoor" x="5.5" y="81" width="11" height="19" rx="1.5"/>
+      <circle class="tknob" cx="14" cy="91" r="1"/>
+      <g class="clickable tsw-g" data-toggle="ingresso_prese">
+        <circle class="tsw" cx="28" cy="90" r="6.5"/>
+        <path class="tbolt" transform="translate(28 90) scale(0.93)" d="M1 -5 L-3.5 1 H-0.5 L-1 5 L3.5 -1 H0.5 Z"/>
+      </g>
+    </g>
     <!-- Allarme: scudo al centro del tetto, icona dall'entità -->
     <g id="g-alarm" class="clickable hidden" data-key="allarme">
       <rect class="hit" x="-9" y="-26" width="18" height="18"/>
@@ -805,6 +848,19 @@ const PDC_CSS = `
   .flow.thin:not(.on) { opacity: 0; }
   .uico { fill: var(--c, var(--pdc-idle)); }
   .aico { fill: var(--c, var(--pdc-idle)); }
+  .gpost { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 3; stroke-linecap: round; }
+  .gbars { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+  .lamp  { fill: var(--l, none); stroke: var(--l, var(--pdc-idle)); stroke-width: 1.4; }
+  .lrays { fill: none; stroke: var(--l, transparent); stroke-width: 1.3; stroke-linecap: round; opacity: 0; }
+  #gate-lamp.on .lrays { opacity: 1; }
+  #gate-lamp.on .lamp { filter: drop-shadow(0 0 3px #ffd54f); }
+  .troof { fill: none; stroke: var(--pdc-idle); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tpost { fill: none; stroke: var(--pdc-idle); stroke-width: 2.4; stroke-linecap: round; }
+  .tdoor { fill: none; stroke: var(--pdc-idle); stroke-width: 1.6; }
+  .tknob { fill: var(--pdc-idle); }
+  .tsw-g { cursor: pointer; }
+  .tsw   { fill: var(--s, transparent); fill-opacity: .25; stroke: var(--s, var(--pdc-idle)); stroke-width: 1.5; }
+  .tbolt { fill: var(--s, var(--pdc-idle)); }
   #g-alarm.trig .aico { animation: pdc-blink 1s steps(2, start) infinite; }
   @keyframes pdc-blink { to { opacity: .2; } }
 
@@ -942,7 +998,15 @@ class PdcFlowCard extends HTMLElement {
 
   _click(ev) {
     if (this._demo) return;
-    const node = ev.composedPath().find((n) => n.getAttribute && (n.getAttribute('data-key') || n.getAttribute('data-entity')));
+    const path = ev.composedPath();
+    // pulsanti delle prese: accendono e spengono direttamente
+    const tg = path.find((n) => n.getAttribute && n.getAttribute('data-toggle'));
+    if (tg) {
+      const tid = this._ids(tg.getAttribute('data-toggle'))[0];
+      if (tid && this._hass && typeof this._hass.callService === 'function') this._hass.callService('homeassistant', 'toggle', { entity_id: tid });
+      return;
+    }
+    const node = path.find((n) => n.getAttribute && (n.getAttribute('data-key') || n.getAttribute('data-entity')));
     if (!node) return;
     let id = node.getAttribute('data-entity');
     if (!id) {
@@ -1551,6 +1615,42 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['g-batt'], BATT);
     this._vis(['g-grid'], GRID || has('rete_stato'));
     this._vis(['g-casa'], HOUSE);
+    // Cancello sotto la casa e tettoia sotto il cancello
+    const GATE = HOUSE && (has('cancello_stato') || has('cancello_luce'));
+    const TT1 = HOUSE && has('tettoia_prese');
+    const TT2 = HOUSE && has('ingresso_prese');
+    const TETT = TT1 || TT2;
+    this._vis(['g-gate'], GATE);
+    this._vis(['tt1'], TT1);
+    this._vis(['tt2'], TT2);
+    if (GATE) {
+      const gs = this._st('cancello_stato');
+      const gv = gs ? String(gs.state).toLowerCase() : '';
+      const open = ['on', 'open', 'opening', 'closing', 'unlocked', 'unlocking'].includes(gv);
+      this._vis(['gate-closed'], !open);
+      this._vis(['gate-open'], open);
+      this._color('g-gate', fixed('cancello') || (open ? '#fb8c00' : gs ? '#b0bec5' : null));
+      const nomi = c.nomi || {};
+      const gName = nomi.cancello !== undefined && nomi.cancello !== null ? String(nomi.cancello) : PDC_NOMI.cancello;
+      const gTxt = gs ? (open ? (gv === 'opening' ? 'apertura' : gv === 'closing' ? 'chiusura' : 'aperto') : 'chiuso') : '';
+      this._text('t-gate', [gName, gTxt].filter(Boolean).join(' '), open ? '#fb8c00' : '');
+      const lOn = this._on('cancello_luce') === true;
+      this._els['gate-lamp'].classList.toggle('on', lOn);
+      this._els['gate-lamp'].style.setProperty('--l', lOn ? '#ffd54f' : 'var(--pdc-idle)');
+      this._vis(['gate-lamp'], has('cancello_luce'));
+    }
+    if (TETT) {
+      const nomi = c.nomi || {};
+      for (const [k, id, nk] of [['tettoia_prese', 'tt1', 'tettoia'], ['ingresso_prese', 'tt2', 'ingresso']]) {
+        const on = this._on(k) === true;
+        const g = this._els[id].querySelector('.tsw-g');
+        if (on) g.style.setProperty('--s', fixed('prese') || '#ffca28');
+        else g.style.removeProperty('--s');
+        const nm = nomi[nk] !== undefined && nomi[nk] !== null ? String(nomi[nk]) : PDC_NOMI[nk];
+        this._els[id + '-t'].textContent = `${nm}: presa ${on ? 'accesa' : 'spenta'}`;
+      }
+    }
+
     // Allarme nel tetto: icona dell'entità (o quella di HA per lo stato) e colore dello stato
     const alSt = this._st('allarme');
     this._vis(['g-alarm'], HOUSE && !!alSt);
@@ -1641,7 +1741,10 @@ class PdcFlowCard extends HTMLElement {
     });
 
     // Altezze: energia (cresce con le utenze) + impianto/acqua
-    const eh = n ? Math.max(E.EH, ys[n - 1] + 30) : E.EH;
+    let eh = n ? Math.max(E.EH, ys[n - 1] + 30) : E.EH;
+    // spazio per cancello e tettoia sotto la casa
+    const gBottom = TETT ? 100 : GATE ? 67 : 0;
+    if (gBottom) eh = Math.max(eh, E.Y + gBottom + 6);
     if (this._eH !== eh) {
       const sv = this._els['sv-e'];
       sv.setAttribute('height', eh);
@@ -1917,6 +2020,10 @@ const PDC_FIELD_SELECTORS = {
   rete_inverti: { boolean: {} },
   casa_potenza: PDC_SENSOR,
   allarme: { entity: { domain: 'alarm_control_panel' } },
+  cancello_stato: PDC_ANY,
+  cancello_luce: PDC_ANY,
+  tettoia_prese: PDC_ANY,
+  ingresso_prese: PDC_ANY,
   rete_stato: PDC_ANY,
   soglia_energia: { number: { min: 0, max: 2, step: 0.01, mode: 'box', unit_of_measurement: 'kW' } },
   temperatura_esterna: PDC_SENSOR,
@@ -1974,6 +2081,8 @@ const PDC_GROUPS = [
   ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'nome_batteria', 'colore_batteria']],
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
   ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'allarme', 'nome_casa', 'colore_casa']],
+  ['cancello', 'Cancello (sotto la casa)', 'mdi:gate', ['cancello_stato', 'cancello_luce', 'nome_cancello', 'colore_cancello']],
+  ['prese', 'Prese tettoia e ingresso', 'mdi:power-socket-eu', ['tettoia_prese', 'ingresso_prese', 'nome_tettoia', 'nome_ingresso', 'colore_prese']],
   ['esterno', 'Temperatura esterna', 'mdi:thermometer', ['temperatura_esterna', 'nome_esterno', 'colore_esterno', 'tcolora_esterno', 'tmin_esterno', 'tmax_esterno']],
   ['locale', 'Locale caldaia', 'mdi:home-thermometer', ['locale_temperatura', 'locale_umidita', 'nome_locale', 'colore_locale', 'tcolora_locale', 'tmin_locale', 'tmax_locale']],
   ['pompa_di_calore', 'Pompa di calore', 'mdi:heat-pump', ['pdc_potenza', 'riscaldamento', 'raffrescamento', 'soglia_pdc', 'nome_pompa_di_calore', 'colore_pompa_di_calore']],
@@ -2030,7 +2139,7 @@ const PDC_U_SELECTORS = {
 // Le tre parti della card, nello stesso ordine del disegno: [chiave, titolo, icona, campi della sezione, gruppi]
 const PDC_SECTIONS = [
   ['energia', 'Energia', 'mdi:lightning-bolt', ['nome_sezione_energia', 'soglia_energia'],
-    ['esterno', 'fotovoltaico', 'batteria', 'rete_elettrica', 'casa']],
+    ['esterno', 'fotovoltaico', 'batteria', 'rete_elettrica', 'casa', 'cancello', 'prese']],
   ['impianto', 'Pompa di calore e impianto', 'mdi:heat-pump', ['nome_sezione_impianto', 'nome_setpoint'],
     ['locale', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo', 'ingresso_accumulo', 'circolatore', 'pavimento']],
   ['acqua', 'Acqua sanitaria', 'mdi:water', ['nome_sezione_acqua'],
@@ -2095,6 +2204,11 @@ const PDC_LABELS = {
   soglia_energia: 'Rete e batteria animate sopra (0 = sempre)',
   casa_potenza: 'Consumo della casa',
   allarme: 'Allarme (scudo nel tetto della casa)',
+  cancello_stato: 'Cancello aperto/chiuso (on o open = aperto)',
+  cancello_luce: 'Luce del cancello (on = accesa)',
+  tettoia_prese: 'Presa tettoia (pulsante: accende/spegne)',
+  ingresso_prese: 'Presa ingresso (pulsante: accende/spegne)',
+  colore_prese: 'Colore pulsanti accesi',
   nome_sezione_energia: 'Nome della sezione',
   colore_rete_elettrica: 'Colore icona e linea',
   colore_fotovoltaico: 'Colore icona e linea',
