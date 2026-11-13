@@ -2,7 +2,7 @@
 
 [🇮🇹 Italiano](#italiano) · [🇬🇧 English](#english)
 
-[![Esempio della card / Card example](images/esempio.png)](https://github.com/powerklash/pdc-flow-card/blob/main/esempio.png)
+![Esempio della card / Card example](images/esempio.png)
 
 ---
 
@@ -73,6 +73,7 @@ entities:
   rete_stato: binary_sensor.rete_collegata
   casa_potenza: sensor.casa_consumo
   # Pompa di calore e impianto
+  allarme: alarm_control_panel.allarme
   locale_temperatura: sensor.locale_temperatura
   locale_umidita: sensor.locale_umidita
   pdc_potenza: sensor.pdc_potenza
@@ -112,6 +113,7 @@ entities:
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
 | `temperatura_esterna` | temperatura esterna, piccola a sinistra del tetto della casa (senza la casa in alto a sinistra; senza la parte energia nel titolo dell'impianto) |
+| `allarme` | allarme (`alarm_control_panel`): scudo al centro del tetto della casa, con l'icona dell'entità o quella di HA per lo stato; verde inserito, grigio disinserito, arancione in attesa, rosso lampeggiante scattato |
 | `locale_temperatura`, `locale_umidita` | temperatura e umidità del locale caldaia, tra pompa di calore e bollitore (nome con `nomi: locale`, colori con `temperature: locale`) |
 | `pdc_potenza` | potenza della pompa di calore (anche una lista di sensori, che vengono sommati) |
 | `riscaldamento`, `raffrescamento` | modalità attiva della pompa di calore |
@@ -270,6 +272,7 @@ See the YAML example in the Italian section above: the keys are the same.
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
 | `casa_potenza` | house consumption (calculated if missing) |
 | `temperatura_esterna` | outdoor temperature, small, left of the house roof (without the house, top-left; without the energy section, in the heating system title) |
+| `allarme` | alarm (`alarm_control_panel`): shield in the middle of the house roof, with the entity's icon or HA's icon for the state; green armed, grey disarmed, orange pending, flashing red triggered |
 | `locale_temperatura`, `locale_umidita` | boiler room temperature and humidity, between heat pump and hot water tank (label with `nomi: locale`, colours with `temperature: locale`) |
 | `pdc_potenza` | heat pump power (also a list of sensors, which are added up) |
 | `riscaldamento`, `raffrescamento` | heating / cooling mode active |

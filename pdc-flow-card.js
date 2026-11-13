@@ -21,6 +21,7 @@
  *       colore: teal              # facoltativo
  *       nascondi_a_zero: true     # facoltativo: la riga sparisce quando è spenta
  *       soglia: 5                 # facoltativo: accesa sopra questo valore (unità del sensore)
+ *     allarme (alarm_control_panel: scudo nel tetto della casa, icona e colore secondo lo stato),
  *     locale_temperatura, locale_umidita (locale caldaia, tra pompa di calore e bollitore),
  *     pdc_potenza (anche lista), riscaldamento, raffrescamento,
  *     acs_potenza | acs_attiva, pdc_mandata, pdc_ritorno, acs_temperatura,
@@ -49,7 +50,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.29.0';
+const PDC_VERSION = '0.30.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -95,7 +96,7 @@ const PDC_COLORI = [
 ];
 
 // Sezione energia (sopra l'impianto)
-const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza'];
+const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme'];
 
 const PDC_ENTITY_KEYS = [
   ...PDC_ENERGY_KEYS,
@@ -111,7 +112,7 @@ const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k)
 // Ordine delle chiavi nello YAML scritto dall'editor: energia, pompa di calore e impianto, acqua sanitaria
 const PDC_ENTITY_ORDER = [
   'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
-  'rete_potenza', 'rete_stato', 'casa_potenza',
+  'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme',
   'locale_temperatura', 'locale_umidita', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
   'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
@@ -142,6 +143,7 @@ const PDC_DEMO = {
   batteria_potenza: ['sensor', -0.6, 'kW'],
   rete_potenza: ['sensor', 0.02, 'kW'],
   casa_potenza: ['sensor', 2.62, 'kW'],
+  allarme: ['alarm_control_panel', 'armed_home'],
   rete_stato: ['binary_sensor', 'on'],
   u_pdc: ['sensor', 1.8, 'kW'],
   u_autoclave: ['sensor', 450, 'W'],
@@ -192,6 +194,13 @@ const PDC_DEMO_UTENZE = [
 
 // Utenze elettriche: colori predefiniti, a rotazione
 const PDC_U_COLORS = ['#d0cc5b', '#964cb5', '#b54c9d', '#5bd0cc', '#e57373', '#81c784', '#64b5f6', '#ffb74d'];
+// Allarme: icone predefinite di Home Assistant per ogni stato (se l'entità non ha un'icona sua)
+const PDC_ALARM_ICONS = {
+  disarmed: 'mdi:shield-off', armed_away: 'mdi:shield-lock', armed_home: 'mdi:shield-home',
+  armed_night: 'mdi:shield-moon', armed_vacation: 'mdi:shield-airplane', armed_custom_bypass: 'mdi:security',
+  arming: 'mdi:shield-outline', pending: 'mdi:shield-outline', disarming: 'mdi:shield-outline', triggered: 'mdi:bell-ring',
+};
+const PDC_SHIELD = 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z';
 // Icona di riserva (mdi:flash) se l'icona di Home Assistant non si può caricare
 const PDC_ICON_FALLBACK = 'M7,2V13H10V22L17,10H13L17,2H7Z';
 const PDC_ICON_CACHE = new Map();
@@ -432,6 +441,11 @@ const PDC_SVG_ENERGY = `
     <rect class="hit" x="-32" y="-34" width="64" height="64"/>
     <path class="roof" d="M-30 -6 L0 -32 L30 -6 Z"/>
     <path class="ico2" d="M17 -17.3 V-28 H22 V-12.9 M-24 -6 V28 H24 V-6"/>
+    <!-- Allarme: scudo al centro del tetto, icona dall'entità -->
+    <g id="g-alarm" class="clickable hidden" data-key="allarme">
+      <rect class="hit" x="-9" y="-26" width="18" height="18"/>
+      <path class="aico" id="alarm-ico" transform="translate(-7 -24) scale(0.5833)" d="${PDC_SHIELD}"/>
+    </g>
     <text x="0" y="7" class="lbl c xs" id="n-casa">Casa</text>
     <text x="0" y="22" class="val c" id="t-casa">—</text>
     <!-- Temperatura esterna: piccola icona a sinistra del tetto, sopra le linee che arrivano alla casa -->
@@ -790,6 +804,9 @@ const PDC_CSS = `
   .flow.thin { transition: opacity .4s; }
   .flow.thin:not(.on) { opacity: 0; }
   .uico { fill: var(--c, var(--pdc-idle)); }
+  .aico { fill: var(--c, var(--pdc-idle)); }
+  #g-alarm.trig .aico { animation: pdc-blink 1s steps(2, start) infinite; }
+  @keyframes pdc-blink { to { opacity: .2; } }
 
   .flow .pipe { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 2.2; stroke-linejoin: round; opacity: .3; transition: opacity .5s, stroke .5s; }
   .flow.on .pipe { opacity: .9; }
@@ -1534,6 +1551,24 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['g-batt'], BATT);
     this._vis(['g-grid'], GRID || has('rete_stato'));
     this._vis(['g-casa'], HOUSE);
+    // Allarme nel tetto: icona dell'entità (o quella di HA per lo stato) e colore dello stato
+    const alSt = this._st('allarme');
+    this._vis(['g-alarm'], HOUSE && !!alSt);
+    if (alSt) {
+      const st = String(alSt.state);
+      const icon = alSt.attributes.icon || PDC_ALARM_ICONS[st] || 'mdi:shield-outline';
+      if (this._alarmIcon !== icon) {
+        this._alarmIcon = icon;
+        pdcLoadIcon(icon).then((path) => {
+          if (this._alarmIcon === icon) this._els['alarm-ico'].setAttribute('d', path || PDC_SHIELD);
+        });
+      }
+      // verde inserito, grigio chiaro disinserito, arancione in attesa, rosso (lampeggiante) scattato
+      const fb = st.startsWith('armed') ? '#43a047' : st === 'triggered' ? '#e53935' : ['arming', 'pending', 'disarming'].includes(st) ? '#fb8c00' : '#b0bec5';
+      const cA = pdcCustomColor((c.colori || {}).allarme) || fb;
+      this._color('g-alarm', cA);
+      this._els['g-alarm'].classList.toggle('trig', st === 'triggered');
+    }
     this._vis(['f-e_sg'], FV && GRID);
     this._vis(['f-e_sh'], FV && HOUSE);
     this._vis(['f-e_sb'], FV && BATT);
@@ -1881,6 +1916,7 @@ const PDC_FIELD_SELECTORS = {
   rete_potenza: PDC_SENSOR,
   rete_inverti: { boolean: {} },
   casa_potenza: PDC_SENSOR,
+  allarme: { entity: { domain: 'alarm_control_panel' } },
   rete_stato: PDC_ANY,
   soglia_energia: { number: { min: 0, max: 2, step: 0.01, mode: 'box', unit_of_measurement: 'kW' } },
   temperatura_esterna: PDC_SENSOR,
@@ -1937,7 +1973,7 @@ const PDC_GROUPS = [
   ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'fv_compatto', 'alba_tramonto', 'sole', 'fv_previsione', 'meteo', 'nome_fotovoltaico', 'nome_alba', 'nome_tramonto', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter']],
   ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'nome_batteria', 'colore_batteria']],
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
-  ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'nome_casa', 'colore_casa']],
+  ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'allarme', 'nome_casa', 'colore_casa']],
   ['esterno', 'Temperatura esterna', 'mdi:thermometer', ['temperatura_esterna', 'nome_esterno', 'colore_esterno', 'tcolora_esterno', 'tmin_esterno', 'tmax_esterno']],
   ['locale', 'Locale caldaia', 'mdi:home-thermometer', ['locale_temperatura', 'locale_umidita', 'nome_locale', 'colore_locale', 'tcolora_locale', 'tmin_locale', 'tmax_locale']],
   ['pompa_di_calore', 'Pompa di calore', 'mdi:heat-pump', ['pdc_potenza', 'riscaldamento', 'raffrescamento', 'soglia_pdc', 'nome_pompa_di_calore', 'colore_pompa_di_calore']],
@@ -2058,6 +2094,7 @@ const PDC_LABELS = {
   rete_stato: 'Stato della rete (on = collegata)',
   soglia_energia: 'Rete e batteria animate sopra (0 = sempre)',
   casa_potenza: 'Consumo della casa',
+  allarme: 'Allarme (scudo nel tetto della casa)',
   nome_sezione_energia: 'Nome della sezione',
   colore_rete_elettrica: 'Colore icona e linea',
   colore_fotovoltaico: 'Colore icona e linea',
