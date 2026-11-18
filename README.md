@@ -65,6 +65,7 @@ entities:
   fv_potenza: sensor.fotovoltaico_potenza
   inverter_1_potenza: sensor.inverter_1_potenza
   inverter_2_potenza: sensor.inverter_2_potenza
+  ups_batteria: sensor.ups_batteria
   fv_previsione: sensor.power_production_now   # previsione (per esempio Forecast.Solar)
   meteo: weather.casa
   batteria_livello: sensor.batteria_livello
@@ -109,6 +110,7 @@ entities:
 |---|---|
 | `fv_potenza` | potenza prodotta dal fotovoltaico (se manca, è la somma degli inverter; i valori negativi contano come 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | potenza dei due inverter, disegnati sotto i pannelli |
+| `ups_batteria` | carica (%) della batteria tampone (UPS) degli inverter: piccola icona "UPS" dentro il pannello, a sinistra, con la barra di carica; verde al 100%, rossa lampeggiante con la percentuale sotto il 100% (nome con `nomi: ups`, colore da carico con `colori: ups`) |
 | `sole` | sole: ora di alba e tramonto, e scelta tra luna e nuvola quando il fotovoltaico non produce (vuoto = `sun.sun`) |
 | `fv_previsione` | potenza prevista adesso (per esempio Forecast.Solar): con 0 W previsti compare la luna |
 | `meteo` | entità meteo: con pioggia o neve compaiono gocce o fiocchi sotto la nuvola |
@@ -181,6 +183,7 @@ utenze:
 | `temperature` | per ogni temperatura `colora: true` e `min` / `max`: scala da celeste a rosso |
 | `soglia_energia` | potenza in kW sopra cui rete e batteria si animano (predefinito 0: qualsiasi valore) |
 | `fv_compatto` | `false` lascia il fotovoltaico grande anche quando non produce (predefinito: si rimpicciolisce) |
+| `animazioni_sempre` | `true` fa muovere flussi, ventole e pompe anche quando il telefono o il PC ha attivo "riduci animazioni" (per esempio "Remove animations" su Android o "Reduce Motion" su iPhone, o certi risparmi energetici); di solito con quell'impostazione la card resta ferma |
 | `alba_tramonto` | `false` nasconde l'ora di alba e tramonto ai lati dei pannelli (le scritte si cambiano con `nomi: alba` e `nomi: tramonto`) |
 | `batteria_inverti`, `rete_inverti` | `true` se il sensore usa il segno opposto |
 | `batteria_colora` | `true` colora la batteria secondo la carica: rossa quando è scarica, verde brillante quando è carica |
@@ -270,6 +273,7 @@ See the YAML example in the Italian section above: the keys are the same.
 |---|---|
 | `fv_potenza` | solar power (if missing, the sum of the inverters; negative values count as 0) |
 | `inverter_1_potenza`, `inverter_2_potenza` | power of the two inverters, drawn below the panels |
+| `ups_batteria` | charge (%) of the inverters' backup battery (UPS): small "UPS" icon inside the panel, on the left, with a charge bar; green at 100%, blinking red with the percentage below 100% (label with `nomi: ups`, colour when charged with `colori: ups`) |
 | `sole` | sun entity: sunrise and sunset times, and the choice between moon and cloud when the panels produce nothing (empty = `sun.sun`) |
 | `fv_previsione` | forecast power right now (for example Forecast.Solar): with 0 W expected the moon is shown |
 | `meteo` | weather entity: rain or snow adds drops or flakes below the cloud |
@@ -333,6 +337,7 @@ In the visual editor use **Aggiungi utenza elettrica** (add electrical load). Ke
 | `temperature` | per temperature `colora: true` and `min` / `max`: light blue to red scale |
 | `soglia_energia` | kW above which grid and battery are animated (default 0: any value) |
 | `fv_compatto` | `false` keeps the solar panel full size when it produces nothing (default: it shrinks) |
+| `animazioni_sempre` | `true` keeps flows, fans and pumps moving even when the phone or PC has "reduce motion" turned on (for example "Remove animations" on Android, "Reduce Motion" on iPhone, or some battery savers); by default the card stays still with that setting |
 | `alba_tramonto` | `false` hides the sunrise and sunset times next to the panels (labels can be changed with `nomi: alba` and `nomi: tramonto`) |
 | `batteria_inverti`, `rete_inverti` | `true` if the sensor uses the opposite sign |
 | `batteria_colora` | `true` colours the battery by charge: red when empty, bright green when full |

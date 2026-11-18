@@ -21,6 +21,7 @@
  *       colore: teal              # facoltativo
  *       nascondi_a_zero: true     # facoltativo: la riga sparisce quando è spenta
  *       soglia: 5                 # facoltativo: accesa sopra questo valore (unità del sensore)
+ *     ups_batteria (% della batteria tampone degli inverter: in alto a sinistra, rossa lampeggiante sotto il 100%),
  *     cancello_stato (on/open = aperto), cancello_luce (on = accesa): cancello sotto la casa,
  *     tettoia_prese, ingresso_prese (switch delle prese): tettoia e ingresso sotto il cancello,
  *       il pulsante accende e spegne la presa,
@@ -47,13 +48,14 @@
  *   fv_compatto: false         # facoltativo: senza produzione il fotovoltaico resta grande (predefinito: si rimpicciolisce)
  *   alba_tramonto: false       # facoltativo: nasconde l'ora di alba (a sinistra) e tramonto (a destra) dei pannelli
  *   acqua_separata: true       # facoltativo: rete e stop come icone a sé (predefinito: dentro il contatore, con il totale)
+ *   animazioni_sempre: true    # facoltativo: animazioni anche se il telefono/PC ha "riduci animazioni" attivo
  *   demo: true                 # facoltativo: dati di esempio finché non si imposta un'entità
  *   batteria_inverti / rete_inverti: true   # facoltativo: segno opposto della potenza
  *   batteria_colora: true      # facoltativo: batteria da rosso (scarica) a verde (carica); batteria_min / batteria_max in %
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.31.0';
+const PDC_VERSION = '0.32.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -63,6 +65,7 @@ const PDC_NOMI = {
   tramonto: 'tramonto',
   inverter_1: 'Inverter 1',
   inverter_2: 'Inverter 2',
+  ups: 'UPS inverter',
   batteria: 'Batteria',
   rete_elettrica: 'Rete',
   casa: 'Casa',
@@ -95,14 +98,14 @@ const PDC_NOMI = {
 
 // Componenti a cui si può dare un colore (sezione "colori:")
 const PDC_COLORI = [
-  'fotovoltaico', 'inverter', 'batteria', 'rete_elettrica', 'casa', 'cancello', 'prese',
+  'fotovoltaico', 'inverter', 'ups', 'batteria', 'rete_elettrica', 'casa', 'cancello', 'prese',
   'esterno', 'locale', 'pompa_di_calore', 'valvola_3_vie', 'mandata', 'ritorno', 'bollitore', 'accumulo',
   'ingresso_accumulo', 'circolatore', 'pavimento', 'rete', 'acqua_fredda', 'stop', 'contatore', 'puffer',
   'autoclave', 'ricircolo', 'rubinetto', 'sentina',
 ];
 
 // Sezione energia (sopra l'impianto)
-const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese'];
+const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'ups_batteria', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese'];
 
 const PDC_ENTITY_KEYS = [
   ...PDC_ENERGY_KEYS,
@@ -117,7 +120,7 @@ const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k)
 
 // Ordine delle chiavi nello YAML scritto dall'editor: energia, pompa di calore e impianto, acqua sanitaria
 const PDC_ENTITY_ORDER = [
-  'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
+  'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'ups_batteria', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
   'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese',
   'locale_temperatura', 'locale_umidita', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
@@ -127,7 +130,7 @@ const PDC_ENTITY_ORDER = [
   'sentina_potenza', 'sentina_energia', 'sentina_stato',
 ];
 const PDC_CONFIG_ORDER = [
-  'type', 'title', 'demo', 'entities', 'utenze',
+  'type', 'title', 'animazioni_sempre', 'demo', 'entities', 'utenze',
   'fv_compatto', 'alba_tramonto', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max',
   'soglia_pdc', 'soglia_acs', 'temperature',
   'acqua_portata_unita', 'acqua_separata', 'puffer',
@@ -145,6 +148,7 @@ const PDC_DEMO = {
   fv_potenza: ['sensor', 3.2, 'kW'],
   inverter_1_potenza: ['sensor', 1.3, 'kW'],
   inverter_2_potenza: ['sensor', 1.9, 'kW'],
+  ups_batteria: ['sensor', 100, '%'],
   batteria_livello: ['sensor', 78, '%'],
   batteria_potenza: ['sensor', -0.6, 'kW'],
   rete_potenza: ['sensor', 0.02, 'kW'],
@@ -411,8 +415,20 @@ const PDC_SVG_ENERGY = `
       <path class="panel" vector-effect="non-scaling-stroke" d="M-52 74 L-40 32 H52 L40 74 Z"/>
       <path class="pgrid" vector-effect="non-scaling-stroke" d="M-21.3 74 L-9.3 32 M9.3 74 L21.3 32 M-46 53 H46"/>
     </g>
-    <text x="0" y="49" class="lbl c xs halo" id="n-fotovoltaico">Fotovoltaico</text>
-    <text x="0" y="65" class="val c halo" id="t-fv">—</text>
+    <text x="38" y="47" class="lbl e xs halo" id="n-fotovoltaico">Fotovoltaico</text>
+    <text x="38" y="64" class="val e halo" id="t-fv">—</text>
+    <!-- UPS degli inverter: piccola batteria dentro il pannello, a sinistra e centrata in altezza -->
+    <g id="g-ups" class="clickable hidden" data-key="ups_batteria" transform="translate(-30 53)">
+      <title id="ups-t">UPS inverter</title>
+      <rect class="hit" x="-13" y="-9" width="26" height="18"/>
+      <g id="ups-ico">
+        <rect class="ubody" x="-11" y="-7" width="22" height="14" rx="2.5"/>
+        <text x="0" y="1.2" class="utxt">UPS</text>
+        <rect class="utrack" x="-7.5" y="3" width="15" height="1.8" rx="0.9"/>
+        <rect class="ufill" id="ups-fill" x="-7.5" y="3" width="15" height="1.8" rx="0.9"/>
+      </g>
+      <text x="0" y="17" class="tv c xs halo hidden" id="t-ups">—</text>
+    </g>
     <!-- Ora di alba (a sinistra) e tramonto (a destra) dei pannelli -->
     <g id="fv-times" class="hidden">
       <text x="-58" y="55" class="lbl xs e" id="n-alba">alba</text>
@@ -859,10 +875,18 @@ const PDC_CSS = `
   .tdoor { fill: none; stroke: var(--pdc-idle); stroke-width: 1.6; }
   .tknob { fill: var(--pdc-idle); }
   .tsw-g { cursor: pointer; }
+  #g-ups { --u: #43a047; }
+  .ubody { fill: var(--pdc-bg); stroke: var(--u); stroke-width: 1.4; }
+  .ufill { fill: var(--u); }
+  .utrack { fill: var(--u); opacity: .25; }
+  .utxt { fill: var(--u); font-size: 6.5px; font-weight: 700; letter-spacing: .4px; text-anchor: middle; }
+  #t-ups { fill: var(--u); }
+  #g-ups.low #ups-ico, #g-ups.low #t-ups { animation: pdc-ublink 1s ease-in-out infinite; }
+  @keyframes pdc-ublink { 50% { opacity: .2; } }
   .tsw   { fill: var(--s, transparent); fill-opacity: .25; stroke: var(--s, var(--pdc-idle)); stroke-width: 1.5; }
   .tbolt { fill: var(--s, var(--pdc-idle)); }
-  #g-alarm.trig .aico { animation: pdc-blink 1s steps(2, start) infinite; }
-  @keyframes pdc-blink { to { opacity: .2; } }
+  #g-alarm.trig .aico { animation: pdc-trig 1s steps(2, start) infinite; }
+  @keyframes pdc-trig { to { opacity: .2; } }
 
   .flow .pipe { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 2.2; stroke-linejoin: round; opacity: .3; transition: opacity .5s, stroke .5s; }
   .flow.on .pipe { opacity: .9; }
@@ -874,8 +898,17 @@ const PDC_CSS = `
   @keyframes pdc-spin  { to { transform: rotate(360deg); } }
   @keyframes pdc-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 4; } }
 
+  /* "Riduci animazioni" del sistema: animazioni ferme, salvo "animazioni_sempre: true" */
   @media (prefers-reduced-motion: reduce) {
-    .flow.on .dots, .run .fan, .run .imp, .run .pring, .run .rays, .run .gwire, .run .gspark { animation: none; }
+    :host(:not([anim-sempre])) .flow.on .dots,
+    :host(:not([anim-sempre])) .run .fan,
+    :host(:not([anim-sempre])) .run .imp,
+    :host(:not([anim-sempre])) .run .pring,
+    :host(:not([anim-sempre])) .run .rays,
+    :host(:not([anim-sempre])) .run .gwire,
+    :host(:not([anim-sempre])) .run .gspark,
+    :host(:not([anim-sempre])) #g-ups.low #ups-ico,
+    :host(:not([anim-sempre])) #g-ups.low #t-ups { animation: none; }
   }
 `;
 
@@ -883,6 +916,7 @@ class PdcFlowCard extends HTMLElement {
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('pdc-flow-card: configurazione non valida');
     this._config = { soglia_pdc: 0.1, soglia_acs: 0.1, soglia_energia: 0, ...config, entities: { ...(config.entities || {}) } };
+    this.toggleAttribute('anim-sempre', config.animazioni_sempre === true);
     // Esempio: solo finché non c'è nessuna entità impostata
     this._demo = config.demo === true && !PDC_ENTITY_KEYS.some((k) => this._config.entities[k]) && !pdcUtenze(config).length;
     if (this._demo) {
@@ -1579,7 +1613,8 @@ class PdcFlowCard extends HTMLElement {
 
     // ---- Disposizione: con utenze a destra, oppure su tutta la larghezza ----
     const lay = n ? PDC_E_LAYOUT.utenze : PDC_E_LAYOUT.pieno;
-    const layKey = (n ? 'u' : 'p') + (COMPACT ? 'c' : '');
+    const fvNoName = (c.nomi || {}).fotovoltaico === '';
+    const layKey = (n ? 'u' : 'p') + (COMPACT ? 'c' : '') + (fvNoName ? 'n' : '');
     if (this._layKey !== layKey) {
       const P = pdcEnergyPaths(lay, E);
       for (const id of PDC_E_FLOWS) this._els['f-' + id].querySelectorAll('path').forEach((pth) => pth.setAttribute('d', P[id]));
@@ -1595,8 +1630,14 @@ class PdcFlowCard extends HTMLElement {
       // pannello piccolo: disegno ridotto, scritte alla dimensione normale
       if (COMPACT) this._els['fv-shape'].setAttribute('transform', 'translate(0 6) scale(0.75)');
       else this._els['fv-shape'].removeAttribute('transform');
-      this._els['n-fotovoltaico'].setAttribute('y', COMPACT ? 43 : 49);
-      this._els['t-fv'].setAttribute('y', COMPACT ? 56 : 65);
+      // nome e valore a destra dentro il pannello; senza nome il valore è centrato in altezza
+      const vx = COMPACT ? 29 : 38;
+      this._els['n-fotovoltaico'].setAttribute('x', vx);
+      this._els['t-fv'].setAttribute('x', vx);
+      this._els['n-fotovoltaico'].setAttribute('y', COMPACT ? 41 : 47);
+      this._els['t-fv'].setAttribute('y', fvNoName ? (COMPACT ? 51.5 : 58.5) : COMPACT ? 56 : 64);
+      // UPS a sinistra, al centro del pannello
+      this._els['g-ups'].setAttribute('transform', COMPACT ? 'translate(-22 45.75)' : 'translate(-30 53)');
       // alba e tramonto più vicini al pannello piccolo
       const tx = COMPACT ? 46 : 58;
       const ty = COMPACT ? 52 : 55;
@@ -1612,6 +1653,26 @@ class PdcFlowCard extends HTMLElement {
     this._vis(['g-inv1', 'f-e_inv1a', 'f-e_inv1b'], INV1 && !COMPACT);
     this._vis(['g-inv2', 'f-e_inv2a', 'f-e_inv2b'], INV2 && !COMPACT);
     this._vis(['jn-s'], FV && (INV1 || INV2) && fvOn);
+    // UPS degli inverter: verde carico, rosso lampeggiante sotto il 100%
+    const UPS = has('ups_batteria');
+    this._vis(['g-ups'], UPS);
+    if (UPS) {
+      const up = this._num('ups_batteria');
+      const ok = up !== null && up >= 99.5;
+      const low = up !== null && !ok;
+      const g = this._els['g-ups'];
+      g.classList.toggle('low', low);
+      const cu = ok ? fixed('ups') || '#43a047' : low ? '#e53935' : '#b0bec5';
+      g.style.setProperty('--u', cu);
+      const lv = up === null ? 0 : Math.max(0, Math.min(100, up));
+      this._els['ups-fill'].setAttribute('width', (15 * lv / 100).toFixed(2));
+      const pct = up === null ? '—' : `${Math.round(up)}%`;
+      this._text('t-ups', pct);
+      // la percentuale compare solo quando non è carica
+      this._vis(['t-ups'], !ok);
+      const nm = (c.nomi || {}).ups;
+      this._els['ups-t'].textContent = `${nm !== undefined && nm !== null ? nm : PDC_NOMI.ups}: ${pct}`;
+    }
     this._vis(['g-batt'], BATT);
     this._vis(['g-grid'], GRID || has('rete_stato'));
     this._vis(['g-casa'], HOUSE);
@@ -2002,6 +2063,7 @@ const PDC_ANY = { entity: {} };
 
 const PDC_FIELD_SELECTORS = {
   title: { text: {} },
+  animazioni_sempre: { boolean: {} },
   fv_potenza: PDC_SENSOR,
   inverter_1_potenza: PDC_SENSOR,
   inverter_2_potenza: PDC_SENSOR,
@@ -2022,6 +2084,7 @@ const PDC_FIELD_SELECTORS = {
   allarme: { entity: { domain: 'alarm_control_panel' } },
   cancello_stato: PDC_ANY,
   cancello_luce: PDC_ANY,
+  ups_batteria: PDC_SENSOR,
   tettoia_prese: PDC_ANY,
   ingresso_prese: PDC_ANY,
   rete_stato: PDC_ANY,
@@ -2077,7 +2140,7 @@ const PDC_FIELD_SELECTORS = {
 
 // [chiave, titolo, icona, campi]; "nome_x" e "colore_x" si riferiscono alle sezioni nomi/colori
 const PDC_GROUPS = [
-  ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'fv_compatto', 'alba_tramonto', 'sole', 'fv_previsione', 'meteo', 'nome_fotovoltaico', 'nome_alba', 'nome_tramonto', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter']],
+  ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'fv_compatto', 'alba_tramonto', 'sole', 'fv_previsione', 'meteo', 'nome_fotovoltaico', 'nome_alba', 'nome_tramonto', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter', 'ups_batteria', 'nome_ups', 'colore_ups']],
   ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'nome_batteria', 'colore_batteria']],
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
   ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'allarme', 'nome_casa', 'colore_casa']],
@@ -2104,7 +2167,7 @@ const PDC_GROUPS = [
   ['sentina', 'Pompa sentina', 'mdi:water-pump', ['sentina_potenza', 'sentina_energia', 'sentina_stato', 'nome_sentina', 'colore_sentina']],
 ];
 
-const PDC_OPT_KEYS = ['title', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto', 'acqua_separata'];
+const PDC_OPT_KEYS = ['title', 'animazioni_sempre', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto', 'acqua_separata'];
 
 const PDC_TNUM = { number: { min: -30, max: 100, step: 1, mode: 'box', unit_of_measurement: '°C' } };
 
@@ -2149,7 +2212,7 @@ const PDC_SECTIONS = [
 function pdcEditorSchema(config) {
   const n = Array.isArray(config.utenze) ? config.utenze.length : 0;
   const byKey = Object.fromEntries(PDC_GROUPS.map((g) => [g[0], g]));
-  const out = [{ name: 'title', selector: pdcSelectorFor('title') }];
+  const out = [{ name: 'title', selector: pdcSelectorFor('title') }, { name: 'animazioni_sempre', selector: pdcSelectorFor('animazioni_sempre') }];
   for (const [key, title, icon, fields, groups] of PDC_SECTIONS) {
     const schema = fields.map((f) => ({ name: f, selector: pdcSelectorFor(f) }));
     for (const gk of groups) schema.push(pdcGroup(byKey[gk]));
@@ -2174,9 +2237,12 @@ function pdcEditorSchema(config) {
 
 const PDC_LABELS = {
   title: 'Titolo della card',
+  animazioni_sempre: 'Animazioni anche con "riduci animazioni" attivo sul telefono',
   fv_potenza: 'Potenza prodotta (totale)',
   inverter_1_potenza: 'Inverter 1: potenza',
   inverter_2_potenza: 'Inverter 2: potenza',
+  ups_batteria: 'UPS degli inverter: carica batteria (%, rosso lampeggiante sotto il 100%)',
+  colore_ups: 'Colore UPS carico',
   nome_fotovoltaico: 'Nome pannelli',
   nome_inverter_1: 'Nome inverter 1',
   nome_inverter_2: 'Nome inverter 2',
@@ -2429,6 +2495,7 @@ class PdcFlowCardEditor extends HTMLElement {
     if (cfg.acqua_portata_unita === 'auto') delete cfg.acqua_portata_unita;
     if (!cfg.puffer) delete cfg.puffer;
     if (!cfg.acqua_separata) delete cfg.acqua_separata;
+    if (!cfg.animazioni_sempre) delete cfg.animazioni_sempre;
     if (!cfg.batteria_inverti) delete cfg.batteria_inverti;
     if (!cfg.batteria_colora) delete cfg.batteria_colora;
     if (!cfg.rete_inverti) delete cfg.rete_inverti;
