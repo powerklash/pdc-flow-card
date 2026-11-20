@@ -1,0 +1,16 @@
+{
+  "name": "pdc-flow-card-dev",
+  "private": true,
+  "description": "Strumenti di prova per pdc-flow-card (non servono a HACS)",
+  "scripts": {
+    "check": "node check.js",
+    "render": "node render.js",
+    "demo": "node demo-image.js",
+    "editor": "node editor-test.js",
+    "motion": "node motion-test.js",
+    "click": "node click-test.js"
+  },
+  "devDependencies": {
+    "playwright": "1.48.2"
+  }
+}

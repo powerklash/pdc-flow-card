@@ -1,0 +1,8 @@
+# strumenti di sviluppo
+node_modules/
+dev/out/
+*.bak.js
+
+# file personali: non vanno mai su GitHub
+CLAUDE.local.md
+dev/private/

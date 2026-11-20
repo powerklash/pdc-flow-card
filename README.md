@@ -74,6 +74,7 @@ entities:
   rete_stato: binary_sensor.rete_collegata
   casa_potenza: sensor.casa_consumo
   # Pompa di calore e impianto
+  casa_temperatura: sensor.temperatura_casa
   allarme: alarm_control_panel.allarme
   cancello_stato: binary_sensor.cancello
   cancello_luce: switch.luce_cancello
@@ -119,6 +120,7 @@ entities:
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
 | `temperatura_esterna` | temperatura esterna, piccola a sinistra del tetto della casa (senza la casa in alto a sinistra; senza la parte energia nel titolo dell'impianto) |
+| `casa_temperatura` | temperatura della casa: piccola, dentro la casa sopra il consumo |
 | `allarme` | allarme (`alarm_control_panel`): scudo al centro del tetto della casa, con l'icona dell'entità o quella di HA per lo stato; verde inserito, grigio disinserito, arancione in attesa, rosso lampeggiante scattato |
 | `cancello_stato`, `cancello_luce` | cancello sotto la casa: aperto (arancione, `on`/`open`) o chiuso (grigio), con la lampada accesa o spenta (nome con `nomi: cancello`, colore fisso con `colori: cancello`) |
 | `tettoia_prese`, `ingresso_prese` | prese di corrente della tettoia (a sinistra) e dell'ingresso (a destra), sotto il cancello e allineate al fondo della batteria: **toccando il pulsante si accende o spegne la presa**; giallo acceso, grigio spento (nomi con `nomi: tettoia` e `nomi: ingresso`, colore con `colori: prese`) |
@@ -282,6 +284,7 @@ See the YAML example in the Italian section above: the keys are the same.
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
 | `casa_potenza` | house consumption (calculated if missing) |
 | `temperatura_esterna` | outdoor temperature, small, left of the house roof (without the house, top-left; without the energy section, in the heating system title) |
+| `casa_temperatura` | house temperature: small, inside the house above the consumption |
 | `allarme` | alarm (`alarm_control_panel`): shield in the middle of the house roof, with the entity's icon or HA's icon for the state; green armed, grey disarmed, orange pending, flashing red triggered |
 | `cancello_stato`, `cancello_luce` | gate below the house: open (orange, `on`/`open`) or closed (grey), with the lamp on or off (label with `nomi: cancello`, fixed colour with `colori: cancello`) |
 | `tettoia_prese`, `ingresso_prese` | power sockets of the canopy (left) and the entrance (right), below the gate and aligned with the bottom of the battery: **tapping the button turns the socket on or off**; yellow on, grey off (labels with `nomi: tettoia` and `nomi: ingresso`, colour with `colori: prese`) |

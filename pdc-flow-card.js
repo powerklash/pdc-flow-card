@@ -26,6 +26,7 @@
  *     tettoia_prese, ingresso_prese (switch delle prese): tettoia e ingresso sotto il cancello,
  *       il pulsante accende e spegne la presa,
  *     allarme (alarm_control_panel: scudo nel tetto della casa, icona e colore secondo lo stato),
+ *     casa_temperatura (temperatura piccola nel tetto della casa, sopra lo scudo),
  *     locale_temperatura, locale_umidita (locale caldaia, tra pompa di calore e bollitore),
  *     pdc_potenza (anche lista), riscaldamento, raffrescamento,
  *     acs_potenza | acs_attiva, pdc_mandata, pdc_ritorno, acs_temperatura,
@@ -55,7 +56,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.32.0';
+const PDC_VERSION = '0.33.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -105,7 +106,7 @@ const PDC_COLORI = [
 ];
 
 // Sezione energia (sopra l'impianto)
-const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'ups_batteria', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese'];
+const PDC_ENERGY_KEYS = ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'ups_batteria', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza', 'rete_potenza', 'rete_stato', 'casa_potenza', 'casa_temperatura', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese'];
 
 const PDC_ENTITY_KEYS = [
   ...PDC_ENERGY_KEYS,
@@ -121,7 +122,7 @@ const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k)
 // Ordine delle chiavi nello YAML scritto dall'editor: energia, pompa di calore e impianto, acqua sanitaria
 const PDC_ENTITY_ORDER = [
   'temperatura_esterna', 'fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'ups_batteria', 'sole', 'fv_previsione', 'meteo', 'batteria_livello', 'batteria_potenza',
-  'rete_potenza', 'rete_stato', 'casa_potenza', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese',
+  'rete_potenza', 'rete_stato', 'casa_potenza', 'casa_temperatura', 'allarme', 'cancello_stato', 'cancello_luce', 'tettoia_prese', 'ingresso_prese',
   'locale_temperatura', 'locale_umidita', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
   'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
@@ -153,6 +154,7 @@ const PDC_DEMO = {
   batteria_potenza: ['sensor', -0.6, 'kW'],
   rete_potenza: ['sensor', 0.02, 'kW'],
   casa_potenza: ['sensor', 2.62, 'kW'],
+  casa_temperatura: ['sensor', 21.5, '°C'],
   allarme: ['alarm_control_panel', 'armed_home'],
   cancello_stato: ['binary_sensor', 'off'],
   cancello_luce: ['switch', 'on'],
@@ -504,6 +506,10 @@ const PDC_SVG_ENERGY = `
     <g id="g-alarm" class="clickable hidden" data-key="allarme">
       <rect class="hit" x="-9" y="-26" width="18" height="18"/>
       <path class="aico" id="alarm-ico" transform="translate(-7 -24) scale(0.5833)" d="${PDC_SHIELD}"/>
+    </g>
+    <g id="g-casa-t" class="clickable hidden" data-key="casa_temperatura">
+      <rect class="hit" x="-14" y="-2" width="28" height="12"/>
+      <text x="0" y="6" class="lbl c xs" id="t-casa-t">—</text>
     </g>
     <text x="0" y="7" class="lbl c xs" id="n-casa">Casa</text>
     <text x="0" y="22" class="val c" id="t-casa">—</text>
@@ -1713,6 +1719,10 @@ class PdcFlowCard extends HTMLElement {
     }
 
     // Allarme nel tetto: icona dell'entità (o quella di HA per lo stato) e colore dello stato
+    const cTemp = this._num('casa_temperatura');
+    this._vis(['g-casa-t'], HOUSE && has('casa_temperatura'));
+    this._color('g-casa-t', fixed('casa'));
+    this._text('t-casa-t', cTemp === null ? '—' : f1(cTemp) + '°');
     const alSt = this._st('allarme');
     this._vis(['g-alarm'], HOUSE && !!alSt);
     if (alSt) {
@@ -2081,6 +2091,7 @@ const PDC_FIELD_SELECTORS = {
   rete_potenza: PDC_SENSOR,
   rete_inverti: { boolean: {} },
   casa_potenza: PDC_SENSOR,
+  casa_temperatura: PDC_SENSOR,
   allarme: { entity: { domain: 'alarm_control_panel' } },
   cancello_stato: PDC_ANY,
   cancello_luce: PDC_ANY,
@@ -2143,7 +2154,7 @@ const PDC_GROUPS = [
   ['fotovoltaico', 'Fotovoltaico e inverter', 'mdi:solar-power', ['fv_potenza', 'inverter_1_potenza', 'inverter_2_potenza', 'fv_compatto', 'alba_tramonto', 'sole', 'fv_previsione', 'meteo', 'nome_fotovoltaico', 'nome_alba', 'nome_tramonto', 'nome_inverter_1', 'nome_inverter_2', 'colore_fotovoltaico', 'colore_inverter', 'ups_batteria', 'nome_ups', 'colore_ups']],
   ['batteria', 'Batteria di accumulo', 'mdi:home-battery', ['batteria_livello', 'batteria_potenza', 'batteria_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'nome_batteria', 'colore_batteria']],
   ['rete_elettrica', 'Rete elettrica', 'mdi:transmission-tower', ['rete_potenza', 'rete_inverti', 'rete_stato', 'nome_rete_elettrica', 'colore_rete_elettrica']],
-  ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'allarme', 'nome_casa', 'colore_casa']],
+  ['casa', 'Casa', 'mdi:home-lightning-bolt', ['casa_potenza', 'casa_temperatura', 'allarme', 'nome_casa', 'colore_casa']],
   ['cancello', 'Cancello (sotto la casa)', 'mdi:gate', ['cancello_stato', 'cancello_luce', 'nome_cancello', 'colore_cancello']],
   ['prese', 'Prese tettoia e ingresso', 'mdi:power-socket-eu', ['tettoia_prese', 'ingresso_prese', 'nome_tettoia', 'nome_ingresso', 'colore_prese']],
   ['esterno', 'Temperatura esterna', 'mdi:thermometer', ['temperatura_esterna', 'nome_esterno', 'colore_esterno', 'tcolora_esterno', 'tmin_esterno', 'tmax_esterno']],
@@ -2269,6 +2280,7 @@ const PDC_LABELS = {
   rete_stato: 'Stato della rete (on = collegata)',
   soglia_energia: 'Rete e batteria animate sopra (0 = sempre)',
   casa_potenza: 'Consumo della casa',
+  casa_temperatura: 'Temperatura della casa (piccola, nel tetto sopra lo scudo)',
   allarme: 'Allarme (scudo nel tetto della casa)',
   cancello_stato: 'Cancello aperto/chiuso (on o open = aperto)',
   cancello_luce: 'Luce del cancello (on = accesa)',
