@@ -75,6 +75,8 @@ entities:
   casa_potenza: sensor.casa_consumo
   # Pompa di calore e impianto
   casa_temperatura: sensor.temperatura_casa
+  acs_livello: sensor.livello_bollitore
+  puffer_livello: sensor.livello_puffer
   allarme: alarm_control_panel.allarme
   cancello_stato: binary_sensor.cancello
   cancello_luce: switch.luce_cancello
@@ -120,6 +122,7 @@ entities:
 | `rete_stato` | stato della rete (on = collegata); se la rete si stacca compare "staccata" |
 | `casa_potenza` | consumo della casa (se manca, viene calcolato) |
 | `temperatura_esterna` | temperatura esterna, piccola a sinistra del tetto della casa (senza la casa in alto a sinistra; senza la parte energia nel titolo dell'impianto) |
+| `acs_livello`, `puffer_livello` | livello dell'acqua in % (0-100) di bollitore e puffer: l'acqua nel disegno sale e scende (senza `acs_livello` il bollitore si riempie in base alla temperatura) |
 | `casa_temperatura` | temperatura della casa: piccola, dentro la casa sopra il consumo |
 | `allarme` | allarme (`alarm_control_panel`): scudo al centro del tetto della casa, con l'icona dell'entità o quella di HA per lo stato; verde inserito, grigio disinserito, arancione in attesa, rosso lampeggiante scattato |
 | `cancello_stato`, `cancello_luce` | cancello sotto la casa: aperto (arancione, `on`/`open`) o chiuso (grigio), con la lampada accesa o spenta (nome con `nomi: cancello`, colore fisso con `colori: cancello`) |
@@ -192,6 +195,7 @@ utenze:
 | `batteria_min`, `batteria_max` | percentuale a cui la batteria è rossa e a cui è verde (predefinito 0 e 100) |
 | `soglia_pdc`, `soglia_acs` | potenza in kW sopra cui la pompa o il ciclo acqua calda sono considerati accesi (predefinito 0,1) |
 | `acqua_portata_unita` | unità della portata se il sensore la dichiara male (`L/h`, `L/min`, `m³/h`…) |
+| `acs_litri`, `puffer_litri` | capacità in litri di bollitore e puffer: con l'entità livello (`acs_livello`, `puffer_livello`) compare la quantità in litri; senza, non compare |
 | `puffer` | `true` mostra il puffer anche senza autoclave |
 | `acqua_separata` | `true` mostra rete e stop come icone a sé, prima del contatore (predefinito: dentro il contatore) |
 | `demo` | `true` mostra dati di esempio finché non è impostata nessuna entità; è l'anteprima che compare nella scelta delle card |
@@ -284,6 +288,7 @@ See the YAML example in the Italian section above: the keys are the same.
 | `rete_stato` | grid status (on = connected); "staccata" (disconnected) is shown when the grid is down |
 | `casa_potenza` | house consumption (calculated if missing) |
 | `temperatura_esterna` | outdoor temperature, small, left of the house roof (without the house, top-left; without the energy section, in the heating system title) |
+| `acs_livello`, `puffer_livello` | water level in % (0-100) of the boiler and the break tank: the water in the drawing rises and falls (without `acs_livello` the boiler fills according to temperature) |
 | `casa_temperatura` | house temperature: small, inside the house above the consumption |
 | `allarme` | alarm (`alarm_control_panel`): shield in the middle of the house roof, with the entity's icon or HA's icon for the state; green armed, grey disarmed, orange pending, flashing red triggered |
 | `cancello_stato`, `cancello_luce` | gate below the house: open (orange, `on`/`open`) or closed (grey), with the lamp on or off (label with `nomi: cancello`, fixed colour with `colori: cancello`) |
@@ -347,6 +352,7 @@ In the visual editor use **Aggiungi utenza elettrica** (add electrical load). Ke
 | `batteria_min`, `batteria_max` | charge (%) at which the battery is red and green (default 0 and 100) |
 | `soglia_pdc`, `soglia_acs` | kW above which the heat pump or the hot-water cycle count as running (default 0.1) |
 | `acqua_portata_unita` | flow unit when the sensor declares a wrong one (`L/h`, `L/min`, `m³/h`…) |
+| `acs_litri`, `puffer_litri` | capacity in litres of the boiler and the break tank: with the level entity (`acs_livello`, `puffer_livello`) the quantity in litres is shown; without it, it is not |
 | `puffer` | `true` shows the break tank even without a booster pump |
 | `acqua_separata` | `true` shows mains and shut-off valve as separate icons before the meter (default: inside the meter) |
 | `demo` | `true` shows sample data until an entity is set; it is the preview in the card picker |

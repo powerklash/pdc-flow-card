@@ -36,6 +36,8 @@
  *   nomi:                # facoltativo, chiavi in PDC_NOMI; '' = nessuna scritta
  *     bollitore: Boiler ACS
  *     rete: ''
+ *   (acs_livello, puffer_livello: livello dell'acqua in % (0-100): il disegno del serbatoio si riempie in proporzione;
+ *    acs_litri, puffer_litri: capacità in litri, al primo livello: se impostata compare la quantità in litri, altrimenti no),
  *   (acs_setpoint / accumulo_setpoint: climate, water_heater o sensore; numero piccolo nel serbatoio)
  *   colori:              # facoltativo: colore di icone e disegni (anche da fermi), chiavi in PDC_COLORI
  *     bollitore: red     # nome tema (red, blue…), #hex o [r, g, b]
@@ -56,7 +58,7 @@
  *   soglia_energia: 0          # facoltativo: kW sopra cui rete e batteria si animano (0 = qualsiasi valore)
  */
 
-const PDC_VERSION = '0.33.0';
+const PDC_VERSION = '0.34.0';
 
 // Nomi predefiniti dei componenti (sezione "nomi:")
 const PDC_NOMI = {
@@ -115,6 +117,7 @@ const PDC_ENTITY_KEYS = [
   'circolatore', 'pavimento_mandata', 'pavimento_ritorno', 'acqua_valvola', 'acqua_portata',
   'acqua_totale', 'acqua_oggi', 'ricircolo', 'autoclave_velocita', 'autoclave_pressione',
   'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'acs_setpoint', 'accumulo_setpoint',
+  'acs_livello', 'puffer_livello',
   'sentina_potenza', 'sentina_energia', 'sentina_stato', 'locale_temperatura', 'locale_umidita',
 ];
 const PDC_MAIN_KEYS = PDC_ENTITY_KEYS.filter((k) => !PDC_ENERGY_KEYS.includes(k));
@@ -126,14 +129,14 @@ const PDC_ENTITY_ORDER = [
   'locale_temperatura', 'locale_umidita', 'pdc_potenza', 'riscaldamento', 'raffrescamento', 'acs_potenza', 'acs_attiva',
   'pdc_mandata', 'pdc_ritorno', 'acs_temperatura', 'acs_setpoint', 'accumulo_temperatura', 'accumulo_setpoint',
   'accumulo_ingresso', 'circolatore', 'pavimento_mandata', 'pavimento_ritorno',
-  'acqua_valvola', 'acqua_stop', 'acqua_portata', 'acqua_totale', 'acqua_oggi',
+  'acs_livello', 'puffer_livello', 'acqua_valvola', 'acqua_stop', 'acqua_portata', 'acqua_totale', 'acqua_oggi',
   'autoclave_velocita', 'autoclave_pressione', 'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'ricircolo',
   'sentina_potenza', 'sentina_energia', 'sentina_stato',
 ];
 const PDC_CONFIG_ORDER = [
   'type', 'title', 'animazioni_sempre', 'demo', 'entities', 'utenze',
   'fv_compatto', 'alba_tramonto', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max',
-  'soglia_pdc', 'soglia_acs', 'temperature',
+  'acs_litri', 'puffer_litri', 'soglia_pdc', 'soglia_acs', 'temperature',
   'acqua_portata_unita', 'acqua_separata', 'puffer',
   'nomi', 'colori',
 ];
@@ -175,6 +178,8 @@ const PDC_DEMO = {
   pdc_ritorno: ['sensor', 31.2, '°C'],
   acs_temperatura: ['sensor', 49.5, '°C'],
   acs_setpoint: ['sensor', 52, '°C'],
+  acs_livello: ['sensor', 70, '%'],
+  puffer_livello: ['sensor', 65, '%'],
   accumulo_temperatura: ['sensor', 34, '°C'],
   accumulo_ingresso: ['sensor', 35.8, '°C'],
   accumulo_setpoint: ['sensor', 35, '°C'],
@@ -578,12 +583,13 @@ ${PDC_SVG_ENERGY}
   <line class="div" id="div-a" x1="18" y1="316" x2="406" y2="316"/>
 
   <!-- Bollitore -->
-  <g id="g-boiler" class="clickable" data-key="acs_temperatura">
+  <g id="g-boiler" class="clickable" data-key="acs_temperatura|acs_livello">
     <rect class="tank" x="258" y="36" width="146" height="194" rx="24"/>
     <rect id="fill-boiler" class="fill" clip-path="url(#cp-boiler)" x="258" y="230" width="146" height="0"/>
     <rect class="tank-o" x="258" y="36" width="146" height="194" rx="24"/>
     <text x="331" y="172" class="big c" id="t-boiler">—</text>
     <text x="331" y="189" class="lbl c sm" id="n-bollitore">Bollitore</text>
+    <text x="331" y="66" class="lbl c sm hidden" id="t-boil-l"></text>
   </g>
   <g id="g-boil-sp" class="clickable" data-key="acs_setpoint">
     <text x="331" y="205" class="lbl c xs"><tspan id="n-setpoint">setpoint</tspan><tspan dx="4" id="t-boil-sp">—</tspan></text>
@@ -725,11 +731,12 @@ ${PDC_SVG_ENERGY}
   </g>
 
   <!-- Puffer: nome dentro -->
-  <g id="g-puffer">
+  <g id="g-puffer" class="clickable" data-key="puffer_livello">
     <rect class="tank" x="182" y="394" width="40" height="84" rx="16"/>
     <rect id="fill-puffer" class="fill" clip-path="url(#cp-puffer)" x="182" y="414" width="40" height="64"/>
     <rect class="tank-o" x="182" y="394" width="40" height="84" rx="16"/>
     <text x="202" y="409" class="lbl c xs halo" id="n-puffer">Puffer</text>
+    <text x="202" y="448" class="lbl c xs halo hidden" id="t-puffer-l"></text>
   </g>
 
   <!-- Autoclave: girante, nome, stato e pressione dentro -->
@@ -803,6 +810,7 @@ const PDC_CSS = `
   .imp      { transform-box: view-box; transform-origin: 259px 422px; }
   .run .imp { animation: pdc-spin var(--spin, .6s) linear infinite; }
   #fill-puffer { fill: var(--c, var(--pdc-idle)); fill-opacity: .18; }
+  .fill { transition: y .8s, height .8s; }
 
   .tank   { fill: var(--pdc-bg); }
   .tank-o { fill: none; stroke: var(--c, var(--pdc-idle)); stroke-width: 2; transition: stroke .5s; }
@@ -1276,6 +1284,30 @@ class PdcFlowCard extends HTMLElement {
     const fh = h * k;
     el.setAttribute('y', (y0 + h - fh).toFixed(1));
     el.setAttribute('height', fh.toFixed(1));
+    el.style.fill = color || '';
+  }
+
+  // Livello in % (0-100): l'acqua sale e scende con una breve transizione
+  _level(id, pct, y0, h, color) {
+    const el = this._els[id];
+    if (!el) return;
+    const k = pct === null || isNaN(pct) ? 0 : Math.min(1, Math.max(0, pct / 100));
+    const fh = h * k;
+    el.setAttribute('y', (y0 + h - fh).toFixed(1));
+    el.setAttribute('height', fh.toFixed(1));
+    el.style.fill = color || '';
+  }
+
+  // Quantità in litri: solo con livello e capacità impostati
+  _litri(id, key, cap, color) {
+    const el = this._els[id];
+    if (!el) return;
+    const capN = Number(cap);
+    const pct = this._has(key) ? this._num(key) : null;
+    const show = capN > 0 && pct !== null && !isNaN(pct);
+    el.classList.toggle('hidden', !show);
+    if (!show) return;
+    el.textContent = Math.round((Math.min(100, Math.max(0, pct)) / 100) * capN) + ' L';
     el.style.fill = color || '';
   }
 
@@ -1896,7 +1928,9 @@ class PdcFlowCard extends HTMLElement {
     const boilTxt = colora('bollitore') ? tc('bollitore', tAcs) : null;
     this._text('t-boiler', fT(tAcs), boilTxt || '');
     paint('n-bollitore', boilTxt);
-    this._fill('fill-boiler', tAcs, 36, 194, cAcs);
+    if (has('acs_livello')) this._level('fill-boiler', this._num('acs_livello'), 36, 194, cAcs);
+    else this._fill('fill-boiler', tAcs, 36, 194, cAcs);
+    this._litri('t-boil-l', 'acs_livello', c.acs_litri, cAcs);
     this._color('g-accu', cAccu);
     const accuTxt = colora('accumulo') ? tc('accumulo', tAccu) : null;
     this._text('t-accu', fT(tAccu), accuTxt || '');
@@ -1962,6 +1996,8 @@ class PdcFlowCard extends HTMLElement {
 
     // Puffer e autoclave
     this._color('g-puffer', col('puffer', COLD));
+    this._litri('t-puffer-l', 'puffer_livello', c.puffer_litri, null);
+    if (has('puffer_livello')) this._level('fill-puffer', this._num('puffer_livello'), 394, 84, col('puffer', COLD));
     this._color('g-auto', fixed('autoclave') || (acRun ? COLD : null));
     this._els['g-auto'].classList.toggle('run', !!acRun);
     if (acRpm) {
@@ -2086,6 +2122,8 @@ const PDC_FIELD_SELECTORS = {
   batteria_potenza: PDC_SENSOR,
   batteria_inverti: { boolean: {} },
   batteria_colora: { boolean: {} },
+  acs_litri: { number: { min: 0, max: 5000, step: 1, mode: 'box', unit_of_measurement: 'L' } },
+  puffer_litri: { number: { min: 0, max: 5000, step: 1, mode: 'box', unit_of_measurement: 'L' } },
   batteria_min: { number: { min: 0, max: 100, step: 1, mode: 'box', unit_of_measurement: '%' } },
   batteria_max: { number: { min: 0, max: 100, step: 1, mode: 'box', unit_of_measurement: '%' } },
   rete_potenza: PDC_SENSOR,
@@ -2118,6 +2156,8 @@ const PDC_FIELD_SELECTORS = {
   circolatore: PDC_ANY,
   pavimento_mandata: PDC_SENSOR,
   pavimento_ritorno: PDC_SENSOR,
+  acs_livello: PDC_SENSOR,
+  puffer_livello: PDC_SENSOR,
   acs_setpoint: { entity: { domain: ['climate', 'water_heater', 'sensor', 'number', 'input_number'] } },
   accumulo_setpoint: { entity: { domain: ['climate', 'water_heater', 'sensor', 'number', 'input_number'] } },
   acqua_valvola: PDC_ANY,
@@ -2163,7 +2203,7 @@ const PDC_GROUPS = [
   ['valvola_3_vie', 'Valvola 3 vie (ciclo ACS)', 'mdi:valve', ['acs_potenza', 'acs_attiva', 'soglia_acs', 'nome_valvola_3_vie', 'colore_valvola_3_vie']],
   ['mandata', 'Mandata', 'mdi:thermometer-chevron-up', ['pdc_mandata', 'nome_mandata', 'colore_mandata', 'tcolora_mandata', 'tmin_mandata', 'tmax_mandata']],
   ['ritorno', 'Ritorno', 'mdi:thermometer-chevron-down', ['pdc_ritorno', 'nome_ritorno', 'colore_ritorno', 'tcolora_ritorno', 'tmin_ritorno', 'tmax_ritorno']],
-  ['bollitore', 'Bollitore', 'mdi:water-boiler', ['acs_temperatura', 'acs_setpoint', 'nome_bollitore', 'colore_bollitore', 'tcolora_bollitore', 'tmin_bollitore', 'tmax_bollitore']],
+  ['bollitore', 'Bollitore', 'mdi:water-boiler', ['acs_temperatura', 'acs_setpoint', 'acs_livello', 'acs_litri', 'nome_bollitore', 'colore_bollitore', 'tcolora_bollitore', 'tmin_bollitore', 'tmax_bollitore']],
   ['accumulo', 'Accumulo', 'mdi:storage-tank', ['accumulo_temperatura', 'accumulo_setpoint', 'nome_accumulo', 'colore_accumulo', 'tcolora_accumulo', 'tmin_accumulo', 'tmax_accumulo']],
   ['ingresso_accumulo', 'Ingresso accumulo', 'mdi:import', ['accumulo_ingresso', 'nome_ingresso_accumulo', 'colore_ingresso_accumulo', 'tcolora_ingresso_accumulo', 'tmin_ingresso_accumulo', 'tmax_ingresso_accumulo']],
   ['circolatore', 'Circolatore pavimento', 'mdi:pump', ['circolatore', 'nome_circolatore', 'colore_circolatore']],
@@ -2171,14 +2211,14 @@ const PDC_GROUPS = [
   ['rete', 'Rete e linee acqua', 'mdi:water', ['nome_rete', 'colore_rete', 'colore_acqua_fredda']],
   ['stop', 'Stop acqua', 'mdi:pipe-valve', ['acqua_valvola', 'nome_stop', 'colore_stop']],
   ['contatore', 'Contatore', 'mdi:counter', ['acqua_portata', 'acqua_portata_unita', 'acqua_totale', 'acqua_oggi', 'acqua_separata', 'nome_contatore', 'colore_contatore']],
-  ['puffer', 'Puffer', 'mdi:storage-tank-outline', ['puffer', 'nome_puffer', 'colore_puffer']],
+  ['puffer', 'Puffer', 'mdi:storage-tank-outline', ['puffer', 'puffer_livello', 'puffer_litri', 'nome_puffer', 'colore_puffer']],
   ['autoclave', 'Autoclave', 'mdi:water-pump', ['autoclave_velocita', 'autoclave_pressione', 'autoclave_portata', 'autoclave_stato', 'autoclave_comando', 'nome_autoclave', 'colore_autoclave']],
   ['ricircolo', 'Ricircolo', 'mdi:reload', ['ricircolo', 'nome_ricircolo', 'colore_ricircolo']],
   ['rubinetto', 'Rubinetto', 'mdi:faucet', ['nome_rubinetto', 'colore_rubinetto']],
   ['sentina', 'Pompa sentina', 'mdi:water-pump', ['sentina_potenza', 'sentina_energia', 'sentina_stato', 'nome_sentina', 'colore_sentina']],
 ];
 
-const PDC_OPT_KEYS = ['title', 'animazioni_sempre', 'acqua_portata_unita', 'puffer', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto', 'acqua_separata'];
+const PDC_OPT_KEYS = ['title', 'animazioni_sempre', 'acqua_portata_unita', 'puffer', 'acs_litri', 'puffer_litri', 'soglia_pdc', 'soglia_acs', 'soglia_energia', 'batteria_inverti', 'rete_inverti', 'batteria_colora', 'batteria_min', 'batteria_max', 'fv_compatto', 'alba_tramonto', 'acqua_separata'];
 
 const PDC_TNUM = { number: { min: -30, max: 100, step: 1, mode: 'box', unit_of_measurement: '°C' } };
 
@@ -2273,6 +2313,8 @@ const PDC_LABELS = {
   batteria_potenza: 'Potenza (positiva = in scarica)',
   batteria_inverti: 'Segno invertito (positiva = in carica)',
   batteria_colora: 'Colore secondo la carica (rosso scarica → verde carica)',
+  acs_litri: 'Capacità del bollitore in litri',
+  puffer_litri: 'Capacità del puffer in litri',
   batteria_min: 'Rosso fino a',
   batteria_max: 'Verde da',
   rete_potenza: 'Potenza (positiva = prelievo dalla rete)',
@@ -2326,6 +2368,8 @@ const PDC_LABELS = {
   nome_sezione_impianto: 'Nome della sezione',
   nome_sezione_acqua: 'Nome della sezione',
   nome_setpoint: 'Scritta prima del setpoint',
+  acs_livello: 'Livello acqua in % (il disegno sale e scende)',
+  puffer_livello: 'Livello acqua del puffer in % (il disegno sale e scende)',
   acs_setpoint: 'Setpoint (numero piccolo nel serbatoio)',
   accumulo_setpoint: 'Setpoint (numero piccolo nel serbatoio)',
   colore_acqua_fredda: 'Colore delle linee acqua',
@@ -2392,6 +2436,7 @@ class PdcFlowCardEditor extends HTMLElement {
           return 'Predefinito: ' + (sch.name.startsWith('tmin_') ? d[0] : d[1]) + ' °C';
         }
         if (sch.name === 'colore_rete_elettrica') return 'Nessuno = blu in prelievo, viola in immissione';
+        if (sch.name === 'acs_litri' || sch.name === 'puffer_litri') return 'Con il livello: mostra la quantità in litri. Vuoto = quantità non mostrata';
         if (sch.name === 'batteria_min') return 'Predefinito: 0 %';
         if (sch.name === 'batteria_max') return 'Predefinito: 100 %';
         if (sch.name === 'batteria_colora') return 'Colora batteria, linea, percentuale e nome. Un colore fisso, se scelto, vale per il disegno';

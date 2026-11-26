@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.34.0
+### Novità
+- **Livello dell'acqua di bollitore e puffer** (`acs_livello`, `puffer_livello`, sensori in %): l'acqua nel disegno sale e scende in base alla percentuale. Senza `acs_livello` il bollitore si riempie in base alla temperatura, come prima. Toccando il serbatoio si apre l'entità.
+- **Quantità in litri** (`acs_litri`, `puffer_litri`, al primo livello): con la capacità impostata compare la quantità (livello per capacità) dentro il serbatoio; senza capacità non compare. Disponibili anche nell'editor.
+
+*English* — New: water level of the boiler and the break tank (`acs_livello`, `puffer_livello`, in %): the water in the drawing rises and falls; optional capacity in litres (`acs_litri`, `puffer_litri`) shows the quantity in litres, hidden if not set.
+
 ## v0.33.0
 ### Novità
 - **Temperatura della casa** (`casa_temperatura`, sensore): temperatura piccola dentro la casa, sopra il consumo. Toccandola si apre l'entità. Colore con `colori: casa`. Disponibile anche nell'editor, nel gruppo Casa.
